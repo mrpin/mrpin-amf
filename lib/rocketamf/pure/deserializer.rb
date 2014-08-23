@@ -9,7 +9,7 @@ module RocketAMF
       # Pass in the class mapper instance to use when deserializing. This
       # enables better caching behavior in the class mapper and allows
       # one to change mappings between deserialization attempts.
-      def initialize class_mapper
+      def initialize(class_mapper)
         @class_mapper = class_mapper
       end
 
@@ -17,93 +17,99 @@ module RocketAMF
       # be a string or StringIO object. If you pass a StringIO object,
       # it will have its position updated to the end of the deserialized
       # data.
-      def deserialize version, source
-        raise ArgumentError, "unsupported version #{version}" unless [0,3].include?(version)
+      def deserialize(version, source)
+        result = []
+
         @version = version
 
-        if StringIO === source
+        if source.is_a?(StringIO)
           @source = source
         elsif source
           @source = StringIO.new(source)
         elsif @source.nil?
-          raise AMFError, "no source to deserialize"
+          raise AMFError, 'no source to deserialize'
         end
 
-        if @version == 0
-          @ref_cache = []
-          return amf0_deserialize
-        else
-          @string_cache = []
-          @object_cache = []
-          @trait_cache = []
-          return amf3_deserialize
+        case @version
+          when 0
+            until @source.eof?
+              @ref_cache = []
+              result << amf0_deserialize
+            end
+          when 3
+            until @source.eof?
+              @string_cache = []
+              @object_cache = []
+              @trait_cache  = []
+              result << amf3_deserialize
+            end
+          else
+            raise ArgumentError, "unsupported version #{version}"
         end
+
+        result
       end
 
       # Reads an object from the deserializer's stream and returns it.
       def read_object
-        if @version == 0
-          return amf0_deserialize
-        else
-          return amf3_deserialize
-        end
+        @version == 0 ? amf0_deserialize : amf3_deserialize
       end
 
       private
       include RocketAMF::Pure::ReadIOHelpers
 
-      def amf0_deserialize type=nil
+      def amf0_deserialize(type = nil)
         type = read_int8 @source unless type
         case type
-        when AMF0_NUMBER_MARKER
-          amf0_read_number
-        when AMF0_BOOLEAN_MARKER
-          amf0_read_boolean
-        when AMF0_STRING_MARKER
-          amf0_read_string
-        when AMF0_OBJECT_MARKER
-          amf0_read_object
-        when AMF0_NULL_MARKER
-          nil
-        when AMF0_UNDEFINED_MARKER
-          nil
-        when AMF0_REFERENCE_MARKER
-          amf0_read_reference
-        when AMF0_HASH_MARKER
-          amf0_read_hash
-        when AMF0_STRICT_ARRAY_MARKER
-          amf0_read_array
-        when AMF0_DATE_MARKER
-          amf0_read_date
-        when AMF0_LONG_STRING_MARKER
-          amf0_read_string true
-        when AMF0_UNSUPPORTED_MARKER
-          nil
-        when AMF0_XML_MARKER
-          amf0_read_string true
-        when AMF0_TYPED_OBJECT_MARKER
-          amf0_read_typed_object
-        when AMF0_AMF3_MARKER
-          deserialize(3, nil)
-        else
-          raise AMFError, "Invalid type: #{type}"
+          when AMF0_NUMBER_MARKER
+            amf0_read_number
+          when AMF0_BOOLEAN_MARKER
+            amf0_read_boolean
+          when AMF0_STRING_MARKER
+            amf0_read_string
+          when AMF0_OBJECT_MARKER
+            amf0_read_object
+          when AMF0_NULL_MARKER
+            nil
+          when AMF0_UNDEFINED_MARKER
+            nil
+          when AMF0_REFERENCE_MARKER
+            amf0_read_reference
+          when AMF0_HASH_MARKER
+            amf0_read_hash
+          when AMF0_STRICT_ARRAY_MARKER
+            amf0_read_array
+          when AMF0_DATE_MARKER
+            amf0_read_date
+          when AMF0_LONG_STRING_MARKER
+            amf0_read_string true
+          when AMF0_UNSUPPORTED_MARKER
+            nil
+          when AMF0_XML_MARKER
+            amf0_read_string true
+          when AMF0_TYPED_OBJECT_MARKER
+            amf0_read_typed_object
+          when AMF0_AMF3_MARKER
+            deserialize(3, nil)
+          else
+            raise AMFError, "Invalid type: #{type}"
         end
       end
 
       def amf0_read_number
-        res = read_double @source
-        (res.is_a?(Float) && res.nan?) ? nil : res # check for NaN and convert them to nil
+        result = read_double @source
+        (result.is_a?(Float) && result.nan?) ? nil : result # check for NaN and convert them to nil
       end
 
       def amf0_read_boolean
         read_int8(@source) != 0
       end
 
-      def amf0_read_string long=false
-        len = long ? read_word32_network(@source) : read_word16_network(@source)
-        str = @source.read(len)
-        str.force_encoding("UTF-8") if str.respond_to?(:force_encoding)
-        str
+      def amf0_read_string(long=false)
+        len    = long ? read_word32_network(@source) : read_word16_network(@source)
+        result = @source.read(len)
+        result.force_encoding('UTF-8') if result.respond_to?(:force_encoding)
+        result
       end
 
       def amf0_read_reference
@@ -112,26 +118,26 @@ module RocketAMF
       end
 
       def amf0_read_array
-        len = read_word32_network(@source)
-        array = []
-        @ref_cache << array
+        len    = read_word32_network(@source)
+        result = []
+        @ref_cache << result
 
         0.upto(len - 1) do
-          array << amf0_deserialize
+          result << amf0_deserialize
         end
-        array
+        result
       end
 
       def amf0_read_date
         seconds = read_double(@source).to_f/1000
-        time = Time.at(seconds)
-        tz = read_word16_network(@source) # Unused
+        time    = Time.at(seconds)
+        tz      = read_word16_network(@source) # Unused
         time
       end
 
-      def amf0_read_props obj={}
+      def amf0_read_props(obj = {})
         while true
-          key = amf0_read_string
+          key  = amf0_read_string
           type = read_int8 @source
           break if type == AMF0_OBJECT_END_MARKER
           obj[key] = amf0_deserialize(type)
@@ -160,7 +166,7 @@ module RocketAMF
       def amf0_read_typed_object
         # Create object to add to ref cache
         class_name = amf0_read_string
-        obj = @class_mapper.get_ruby_obj class_name
+        obj        = @class_mapper.get_ruby_obj class_name
         @ref_cache << obj
 
         # Populate object
@@ -172,52 +178,52 @@ module RocketAMF
       def amf3_deserialize
         type = read_int8 @source
         case type
-        when AMF3_UNDEFINED_MARKER
-          nil
-        when AMF3_NULL_MARKER
-          nil
-        when AMF3_FALSE_MARKER
-          false
-        when AMF3_TRUE_MARKER
-          true
-        when AMF3_INTEGER_MARKER
-          amf3_read_integer
-        when AMF3_DOUBLE_MARKER
-          amf3_read_number
-        when AMF3_STRING_MARKER
-          amf3_read_string
-        when AMF3_XML_DOC_MARKER, AMF3_XML_MARKER
-          amf3_read_xml
-        when AMF3_DATE_MARKER
-          amf3_read_date
-        when AMF3_ARRAY_MARKER
-          amf3_read_array
-        when AMF3_OBJECT_MARKER
-          amf3_read_object
-        when AMF3_BYTE_ARRAY_MARKER
-          amf3_read_byte_array
-        when AMF3_VECTOR_INT_MARKER, AMF3_VECTOR_UINT_MARKER, AMF3_VECTOR_DOUBLE_MARKER, AMF3_VECTOR_OBJECT_MARKER
-          amf3_read_vector type
-        when AMF3_DICT_MARKER
-          amf3_read_dict
-        else
-          raise AMFError, "Invalid type: #{type}"
+          when AMF3_UNDEFINED_MARKER
+            nil
+          when AMF3_NULL_MARKER
+            nil
+          when AMF3_FALSE_MARKER
+            false
+          when AMF3_TRUE_MARKER
+            true
+          when AMF3_INTEGER_MARKER
+            amf3_read_integer
+          when AMF3_DOUBLE_MARKER
+            amf3_read_number
+          when AMF3_STRING_MARKER
+            amf3_read_string
+          when AMF3_XML_DOC_MARKER, AMF3_XML_MARKER
+            amf3_read_xml
+          when AMF3_DATE_MARKER
+            amf3_read_date
+          when AMF3_ARRAY_MARKER
+            amf3_read_array
+          when AMF3_OBJECT_MARKER
+            amf3_read_object
+          when AMF3_BYTE_ARRAY_MARKER
+            amf3_read_byte_array
+          when AMF3_VECTOR_INT_MARKER, AMF3_VECTOR_UINT_MARKER, AMF3_VECTOR_DOUBLE_MARKER, AMF3_VECTOR_OBJECT_MARKER
+            amf3_read_vector type
+          when AMF3_DICT_MARKER
+            amf3_read_dict
+          else
+            raise AMFError, "Invalid type: #{type}"
         end
       end
 
       def amf3_read_integer
-        n = 0
-        b = read_word8(@source) || 0
+        n      = 0
+        b      = read_word8(@source) || 0
         result = 0
 
         while ((b & 0x80) != 0 && n < 3)
           result = result << 7
           result = result | (b & 0x7f)
-          b = read_word8(@source) || 0
-          n = n + 1
+          b      = read_word8(@source) || 0
+          n      = n + 1
         end
 
-        if (n < 3)
+        if n < 3
           result = result << 7
           result = result | b
         else
@@ -226,7 +232,7 @@ module RocketAMF
           result = result | b
 
           #Check if the integer should be negative
-          if (result > MAX_INTEGER)
+          if result > MAX_INTEGER
             result -= (1 << 29)
           end
         end
@@ -239,7 +245,7 @@ module RocketAMF
       end
 
       def amf3_read_string
-        type = amf3_read_integer
+        type         = amf3_read_integer
         is_reference = (type & 0x01) == 0
 
         if is_reference
@@ -247,10 +253,10 @@ module RocketAMF
           return @string_cache[reference]
         else
           length = type >> 1
-          str = ""
+          str    = ''
           if length > 0
             str = @source.read(length)
-            str.force_encoding("UTF-8") if str.respond_to?(:force_encoding)
+            str.force_encoding('UTF-8') if str.respond_to?(:force_encoding)
             @string_cache << str
           end
           return str
@@ -258,26 +264,30 @@ module RocketAMF
       end
 
       def amf3_read_xml
-        type = amf3_read_integer
+        result = nil
+
+        type         = amf3_read_integer
         is_reference = (type & 0x01) == 0
 
         if is_reference
           reference = type >> 1
-          return @object_cache[reference]
+          result    = @object_cache[reference]
         else
           length = type >> 1
-          str = ""
+          str    = ""
           if length > 0
             str = @source.read(length)
             str.force_encoding("UTF-8") if str.respond_to?(:force_encoding)
             @object_cache << str
           end
-          return str
+          result = str
         end
+
+        result
       end
 
       def amf3_read_byte_array
-        type = amf3_read_integer
+        type         = amf3_read_integer
         is_reference = (type & 0x01) == 0
 
         if is_reference
@@ -285,65 +295,66 @@ module RocketAMF
           return @object_cache[reference]
         else
           length = type >> 1
-          obj = StringIO.new @source.read(length)
+          obj    = StringIO.new @source.read(length)
           @object_cache << obj
           obj
         end
       end
 
       def amf3_read_array
-        type = amf3_read_integer
+        type         = amf3_read_integer
         is_reference = (type & 0x01) == 0
 
         if is_reference
           reference = type >> 1
           return @object_cache[reference]
         else
-          length = type >> 1
+          length        = type >> 1
           property_name = amf3_read_string
-          array = property_name.length > 0 ? {} : []
+          array         = property_name.length > 0 ? {} : []
           @object_cache << array
 
           while property_name.length > 0
-            value = amf3_deserialize
+            value                = amf3_deserialize
             array[property_name] = value
-            property_name = amf3_read_string
+            property_name        = amf3_read_string
           end
-          0.upto(length - 1) {|i| array[i] = amf3_deserialize }
+          0.upto(length - 1) { |i| array[i] = amf3_deserialize }
 
           array
         end
       end
 
       def amf3_read_object
-        type = amf3_read_integer
+        type         = amf3_read_integer
         is_reference = (type & 0x01) == 0
 
         if is_reference
           reference = type >> 1
           return @object_cache[reference]
         else
-          class_type = type >> 1
+          class_type         = type >> 1
           class_is_reference = (class_type & 0x01) == 0
 
           if class_is_reference
             reference = class_type >> 1
-            traits = @trait_cache[reference]
+            traits    = @trait_cache[reference]
           else
-            externalizable = (class_type & 0x02) != 0
-            dynamic = (class_type & 0x04) != 0
+            externalizable  = (class_type & 0x02) != 0
+            dynamic         = (class_type & 0x04) != 0
             attribute_count = class_type >> 3
-            class_name = amf3_read_string
+            class_name      = amf3_read_string
 
             class_attributes = []
-            attribute_count.times{class_attributes << amf3_read_string} # Read class members
+            attribute_count.times { class_attributes << amf3_read_string } # Read class members
 
-            traits = {
-                      :class_name => class_name,
-                      :members => class_attributes,
-                      :externalizable => externalizable,
-                      :dynamic => dynamic
-                     }
+            traits =
+                {
+                    class_name:     class_name,
+                    members:        class_attributes,
+                    externalizable: externalizable,
+                    dynamic:        dynamic
+                }
             @trait_cache << traits
           end
 
@@ -362,15 +373,15 @@ module RocketAMF
           else
             props = {}
             traits[:members].each do |key|
-              value = amf3_deserialize
+              value      = amf3_deserialize
               props[key] = value
             end
 
             dynamic_props = nil
             if traits[:dynamic]
               dynamic_props = {}
-              while (key = amf3_read_string) && key.length != 0  do # read next key
-                value = amf3_deserialize
+              while (key = amf3_read_string) && key.length != 0 do # read next key
+                value              = amf3_deserialize
                 dynamic_props[key] = value
               end
             end
@@ -382,21 +393,21 @@ module RocketAMF
       end
 
       def amf3_read_date
-        type = amf3_read_integer
+        type         = amf3_read_integer
         is_reference = (type & 0x01) == 0
         if is_reference
           reference = type >> 1
           return @object_cache[reference]
         else
           seconds = read_double(@source).to_f/1000
-          time = Time.at(seconds)
+          time    = Time.at(seconds)
           @object_cache << time
           time
         end
       end
 
       def amf3_read_dict
-        type = amf3_read_integer
+        type         = amf3_read_integer
         is_reference = (type & 0x01) == 0
         if is_reference
           reference = type >> 1
@@ -404,7 +415,7 @@ module RocketAMF
         else
           dict = {}
           @object_cache << dict
-          length = type >> 1
+          length    = type >> 1
           weak_keys = read_int8 @source # Ignore: Not supported in ruby
           0.upto(length - 1) do |i|
             dict[amf3_deserialize] = amf3_deserialize
@@ -414,7 +425,7 @@ module RocketAMF
       end
 
       def amf3_read_vector vector_type
-        type = amf3_read_integer
+        type         = amf3_read_integer
         is_reference = (type & 0x01) == 0
         if is_reference
           reference = type >> 1
@@ -422,30 +433,30 @@ module RocketAMF
         else
           vec = []
           @object_cache << vec
-          length = type >> 1
+          length       = type >> 1
           fixed_vector = read_int8 @source # Ignore
           case vector_type
-          when AMF3_VECTOR_INT_MARKER
-            0.upto(length - 1) do |i|
-              int = read_word32_network(@source)
-              int = int - 2**32 if int > MAX_INTEGER
-              vec << int
-            end
-          when AMF3_VECTOR_UINT_MARKER
-            0.upto(length - 1) do |i|
-              vec << read_word32_network(@source)
-              puts vec[i].to_s(2)
-            end
-          when AMF3_VECTOR_DOUBLE_MARKER
-            0.upto(length - 1) do |i|
-              vec << amf3_read_number
-            end
-          when AMF3_VECTOR_OBJECT_MARKER
-            vector_class = amf3_read_string # Ignore
-            puts vector_class
-            0.upto(length - 1) do |i|
-              vec << amf3_deserialize
-            end
+            when AMF3_VECTOR_INT_MARKER
+              0.upto(length - 1) do |i|
+                int = read_word32_network(@source)
+                int = int - 2**32 if int > MAX_INTEGER
+                vec << int
+              end
+            when AMF3_VECTOR_UINT_MARKER
+              0.upto(length - 1) do |i|
+                vec << read_word32_network(@source)
+                puts vec[i].to_s(2)
+              end
+            when AMF3_VECTOR_DOUBLE_MARKER
+              0.upto(length - 1) do |i|
+                vec << amf3_read_number
+              end
+            when AMF3_VECTOR_OBJECT_MARKER
+              vector_class = amf3_read_string # Ignore
+              puts vector_class
+              0.upto(length - 1) do |i|
+                vec << amf3_deserialize
+              end
           end
           vec
         end

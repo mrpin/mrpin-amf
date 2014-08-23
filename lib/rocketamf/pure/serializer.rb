@@ -357,7 +357,7 @@ module RocketAMF
         class_name = is_default ? "__default__" : traits[:class_name]
 
         # Write out traits
-        if (class_name && @trait_cache[class_name] != nil)
+        if class_name && @trait_cache[class_name] != nil
           @stream << pack_integer(@trait_cache[class_name] << 2 | 0x01)
         else
           @trait_cache.add_obj class_name if class_name
@@ -370,8 +370,8 @@ module RocketAMF
           @stream << pack_integer(header)
 
           # Write out class name
-          if class_name == "__default__"
-            amf3_write_utf8_vr("")
+          if class_name == '__default__'
+            amf3_write_utf8_vr('')
           else
             amf3_write_utf8_vr(class_name.to_s)
           end
