@@ -2,7 +2,7 @@
 
 Gem::Specification.new do |s|
   s.name    = 'mrpin-rocketamf'
-  s.version = '1.0.2'
+  s.version = '1.0.4'
   s.platform = Gem::Platform::RUBY
   s.authors  = ['Jacob Henry', 'Stephen Augenstein', "Joc O'Connor"]
   s.email    = ['perl.programmer@gmail.com']
