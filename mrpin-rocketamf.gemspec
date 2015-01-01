@@ -2,7 +2,7 @@
 
 Gem::Specification.new do |spec|
   spec.name        = 'mrpin-rocketamf'
-  spec.version     = '2.0.0'
+  spec.version     = '2.0.1'
   spec.platform    = Gem::Platform::RUBY
   spec.authors     = ['Jacob Henry', 'Stephen Augenstein', "Joc O'Connor", 'Gregory Tkach']
   spec.email       = %w(gregory.tkach@gmail.com)
@@ -11,16 +11,7 @@ Gem::Specification.new do |spec|
   spec.summary     = 'Fast AMF3 serializer/deserializer'
   spec.description = 'Fast AMF3 serializer/deserializer with remoting request/response wrappers to simplify integration'
 
-  files = []
-  files << 'README.rdoc'
-  files << 'benchmark.rb'
-  files << 'mrpin-rocketamf.gemspec'
-  files << 'Rakefile'
-  files << 'lib/**/*.rb'
-  files << 'spec/**/*.{rb,bin,opts}'
-  files << 'ext/**/*.{c,h,rb}'
-
-  spec.files         = Dir[*files]
+  spec.files         = `git ls-files`.split($/)
   spec.test_files    = Dir[*['spec/**/*_spec.rb']]
   spec.extensions    = Dir[*['ext/**/extconf.rb']]
   spec.require_paths = ['lib']
