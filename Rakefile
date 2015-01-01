@@ -9,7 +9,7 @@ desc 'Default: run the specs.'
 task default: :spec
 
 # I don't want to depend on bundler, so we do it the bundler way without it
-gemspec_path = 'mrpin-rocketamf.gemspec'
+gemspec_path = 'mrpin-amf.gemspec'
 spec         = begin
   eval(File.read(File.join(File.dirname(__FILE__), gemspec_path)), TOPLEVEL_BINDING, gemspec_path)
 rescue LoadError => e

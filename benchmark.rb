@@ -28,7 +28,8 @@ OBJECT_COUNT.times do
   objs << TestClass.new.populate
 end
 
-%w(native pure).each do |type|
+#todo: add native
+%w( pure).each do |type|
 
   use_ruby_version = type == 'pure'
 
