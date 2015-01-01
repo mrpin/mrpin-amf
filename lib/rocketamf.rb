@@ -38,15 +38,15 @@ require 'rocketamf/pure'
 # some benchmarks I took using using a simple little benchmarking utility I whipped
 # up, which can be found in the root of the repository.
 #
-#todo:change benchmark
 #   # 100000 objects
-#   # Ruby 1.8
+#   # Ruby 2.0
+#todo:update native benchmark
 #   Testing native AMF3:
 #     minimum serialize time: 1.444652s
 #     minimum deserialize time: 0.879407s
 #   Testing pure AMF3:
-#     minimum serialize time: 31.637864s
-#     minimum deserialize time: 14.773969s
+#     minimum serialize time: 49.294496s
+#     minimum deserialize time: 6.600238s
 #
 # == Serialization & Deserialization
 #

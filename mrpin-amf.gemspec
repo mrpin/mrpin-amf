@@ -2,7 +2,7 @@
 
 Gem::Specification.new do |spec|
   spec.name        = 'mrpin-amf'
-  spec.version     = '2.0.1'
+  spec.version     = '2.0.2'
   spec.platform    = Gem::Platform::RUBY
   spec.authors     = ['Jacob Henry', 'Stephen Augenstein', "Joc O'Connor", 'Gregory Tkach']
   spec.email       = %w(gregory.tkach@gmail.com)

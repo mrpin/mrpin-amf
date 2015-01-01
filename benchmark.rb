@@ -11,7 +11,7 @@ TESTS        = 5
 class TestClass
   attr_accessor :prop_a, :prop_b, :prop_c, :prop_d, :prop_e
 
-  def populate some_arg=nil # Make sure class mapper doesn't think populate is a property
+  def populate(some_arg = nil) # Make sure class mapper doesn't think populate is a property
     @@count ||= 1
     @prop_a = "asdfasdf #{@@count}"
     @prop_b = "simple string"
