@@ -88,15 +88,15 @@ static VALUE mapset_init(VALUE self) {
 static VALUE mapset_map_defaults(VALUE self) {
     const int NUM_MAPPINGS = 9;
     const char* ruby_classes[] = {
-        "RocketAMF::Values::AbstractMessage",
-        "RocketAMF::Values::RemotingMessage",
-        "RocketAMF::Values::AsyncMessage",
-        "RocketAMF::Values::AsyncMessageExt",
-        "RocketAMF::Values::CommandMessage",
-        "RocketAMF::Values::CommandMessageExt",
-        "RocketAMF::Values::AcknowledgeMessage",
-        "RocketAMF::Values::AcknowledgeMessageExt",
-        "RocketAMF::Values::ErrorMessage"
+        "RocketAMF::Types::AbstractMessage",
+        "RocketAMF::Types::RemotingMessage",
+        "RocketAMF::Types::AsyncMessage",
+        "RocketAMF::Types::AsyncMessageExt",
+        "RocketAMF::Types::CommandMessage",
+        "RocketAMF::Types::CommandMessageExt",
+        "RocketAMF::Types::AcknowledgeMessage",
+        "RocketAMF::Types::AcknowledgeMessageExt",
+        "RocketAMF::Types::ErrorMessage"
     };
     const char* as_classes[] = {
         "flex.messaging.messages.AbstractMessage",
@@ -309,7 +309,7 @@ static VALUE mapping_as_class_name(VALUE self, VALUE obj) {
  *
  * Instantiates a ruby object using the mapping configuration based on the
  * source AS class name. If there is no mapping defined, it returns a
- * <tt>RocketAMF::Values::TypedHash</tt> with the serialized class name.
+ * <tt>RocketAMF::Types::TypedHash</tt> with the serialized class name.
  */
 static VALUE mapping_get_ruby_obj(VALUE self, VALUE name) {
     CLASS_MAPPING *map;
@@ -475,7 +475,7 @@ void Init_rocket_amf_fast_class_mapping() {
     rb_define_method(cFastClassMapping, "props_for_serialization", mapping_props, 1);
 
     // Cache values
-    cTypedHash = rb_const_get(rb_const_get(mRocketAMF, rb_intern("Values")), rb_intern("TypedHash"));
+    cTypedHash = rb_const_get(rb_const_get(mRocketAMF, rb_intern("Types")), rb_intern("TypedHash"));
     id_use_ac = rb_intern("use_array_collection");
     id_use_ac_ivar = rb_intern("@use_array_collection");
     id_mappings = rb_intern("mappings");

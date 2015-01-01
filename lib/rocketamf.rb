@@ -1,20 +1,31 @@
 $:.unshift(File.dirname(__FILE__)) unless $:.include?(File.dirname(__FILE__)) || $:.include?(File.expand_path(File.dirname(__FILE__)))
 $:.unshift "#{File.expand_path(File.dirname(__FILE__))}/rocketamf/"
+$:.unshift "#{File.expand_path(File.dirname(__FILE__))}/rocketamf/types/"
 
-require "date"
-require "stringio"
+require 'date'
+require 'stringio'
+require 'rocketamf/errors'
 require 'rocketamf/extensions'
-require 'rocketamf/class_mapping'
+require 'rocketamf/mapping/class_mapping'
 require 'rocketamf/constants'
-require 'rocketamf/remoting'
+require 'rocketamf/types'
 
-# RocketAMF is a full featured AMF0/3 serializer and deserializer with support for
+
+#todo: implement C version
+# begin
+#   require 'rocketamf/ext'
+# rescue LoadError
+
+require 'rocketamf/pure'
+# end
+
+# MrPin RocketAMF is a full featured AMF3 serializer and deserializer with support for
 # bi-directional Flash to Ruby class mapping, custom serialization and mapping,
-# remoting gateway helpers that follow AMF0/3 messaging specs, and a suite of specs
+# remoting gateway helpers that follow AMF3 messaging specs, and a suite of specs
 # to ensure adherence to the specification documents put out by Adobe. If the C
 # components compile, then RocketAMF automatically takes advantage of them to
 # provide a substantial performance benefit. In addition, RocketAMF is fully
-# compatible with Ruby 1.9.
+# compatible with Ruby 2.0, 2.1.
 #
 # == Performance
 #
@@ -27,17 +38,12 @@ require 'rocketamf/remoting'
 # some benchmarks I took using using a simple little benchmarking utility I whipped
 # up, which can be found in the root of the repository.
 #
+#todo:change benchmark
 #   # 100000 objects
 #   # Ruby 1.8
-#   Testing native AMF0:
-#     minimum serialize time: 1.229868s
-#     minimum deserialize time: 0.86465s
 #   Testing native AMF3:
 #     minimum serialize time: 1.444652s
 #     minimum deserialize time: 0.879407s
-#   Testing pure AMF0:
-#     minimum serialize time: 25.427931s
-#     minimum deserialize time: 11.706084s
 #   Testing pure AMF3:
 #     minimum serialize time: 31.637864s
 #     minimum deserialize time: 14.773969s
@@ -47,9 +53,7 @@ require 'rocketamf/remoting'
 # RocketAMF provides two main methods - <tt>serialize</tt> and <tt>deserialize</tt>.
 # Deserialization takes a String or StringIO object and the AMF version if different
 # from the default. Serialization takes any Ruby object and the version if different
-# from the default. Both default to AMF0, as it's more widely supported and slightly
-# faster, but AMF3 does a better job of not sending duplicate data. Which you choose
-# depends on what you need to communicate with and how much serialized size matters.
+# from the default. AMF3  not sending duplicate data.
 #
 # == Mapping Classes Between Flash and Ruby
 #
@@ -59,50 +63,6 @@ require 'rocketamf/remoting'
 # mapping tool is not sufficient for your needs, you also have the option to
 # replace it with a class mapper of your own devising that matches the documented
 # API.
-#
-# == Remoting
-#
-# You can use RocketAMF bare to write an AMF gateway using the following code.
-# In addition, you can use rack-amf (http://github.com/rubyamf/rack-amf) or
-# RubyAMF (http://github.com/rubyamf/rubyamf), both of which provide rack-compliant
-# AMF gateways.
-#
-#   # helloworld.ru
-#   require 'rocketamf'
-#
-#   class HelloWorldApp
-#     APPLICATION_AMF = 'application/x-amf'.freeze
-#
-#     def call env
-#       if is_amf?(env)
-#         # Wrap request and response
-#         env['rack.input'].rewind
-#         request = RocketAMF::Envelope.new.populate_from_stream(env['rack.input'].read)
-#         response = RocketAMF::Envelope.new
-#
-#         # Handle request
-#         response.each_method_call request do |method, args|
-#           raise "Service #{method} does not exists" unless method == 'App.helloWorld'
-#           'Hello world'
-#         end
-#
-#         # Pass back response
-#         response_str = response.serialize
-#         return [200, {'Content-Type' => APPLICATION_AMF, 'Content-Length' => response_str.length.to_s}, [response_str]]
-#       else
-#         return [200, {'Content-Type' => 'text/plain', 'Content-Length' => '16' }, ["Rack AMF gateway"]]
-#       end
-#     end
-#
-#     private
-#     def is_amf? env
-#       return false unless env['CONTENT_TYPE'] == APPLICATION_AMF
-#       return false unless env['PATH_INFO'] == '/amf'
-#       return true
-#     end
-#   end
-#
-#   run HelloWorldApp.new
 #
 # == Advanced Serialization (encode_amf and IExternalizable)
 #
@@ -129,11 +89,7 @@ require 'rocketamf/remoting'
 #
 #   class VariableObject
 #     def encode_amf ser
-#       if ser.version == 0
-#         ser.serialize 0, true
-#       else
-#         ser.serialize 3, false
-#       end
+#         ser.serialize(false)
 #     end
 #   end
 #
@@ -148,10 +104,6 @@ require 'rocketamf/remoting'
 #
 #   class ResultSet < Array
 #     def encode_amf ser
-#       if ser.version == 0
-#         # Serialize as simple array in AMF0
-#         ser.write_array self
-#       else
 #         # Serialize as an ArrayCollection object
 #         # It conforms to IExternalizable, does not have any dynamic properties,
 #         # and has no "sealed" members. See the AMF3 specs for more details about
@@ -162,7 +114,6 @@ require 'rocketamf/remoting'
 #           :dynamic => false,
 #           :members => []
 #         }
-#       end
 #     end
 #   
 #     # Write self as array to stream
@@ -176,43 +127,35 @@ require 'rocketamf/remoting'
 #     end
 #   end
 module RocketAMF
-  #todo: implement C version
-  # begin
-  #   require 'rocketamf/ext'
-  # rescue LoadError
 
-    require 'rocketamf/pure'
-  # end
+  #
+  # Constants
+  #
+
+  #todo: use c version
+  CLASS_MAPPER = RocketAMF::ClassMapping
+
+  #
+  # Static methods
+  #
 
   # Deserialize the AMF string _source_ of the given AMF version into a Ruby
   # data structure and return it. Creates an instance of <tt>RocketAMF::Deserializer</tt>
-  # with a new instance of <tt>RocketAMF::ClassMapper</tt> and calls deserialize
-  # on it with the given source and amf version, returning the result.
-  def self.deserialize source, amf_version = 0
-    des = RocketAMF::Deserializer.new(RocketAMF::ClassMapper.new)
-    des.deserialize(amf_version, source)
+  # with a new instance of <tt>RocketAMF::CLASS_MAPPER</tt> and calls deserialize
+  # on it with the given source, returning the result.
+  def self.deserialize(source)
+    deserializer = RocketAMF::Deserializer.new(RocketAMF::CLASS_MAPPER.new)
+    deserializer.deserialize(source)
   end
 
   # Serialize the given Ruby data structure _obj_ into an AMF stream using the
   # given AMF version. Creates an instance of <tt>RocketAMF::Serializer</tt>
-  # with a new instance of <tt>RocketAMF::ClassMapper</tt> and calls serialize
-  # on it with the given object and amf version, returning the result.
-  def self.serialize obj, amf_version = 0
-    ser = RocketAMF::Serializer.new(RocketAMF::ClassMapper.new)
-    ser.serialize(amf_version, obj)
+  # with a new instance of <tt>RocketAMF::CLASS_MAPPER</tt> and calls serialize
+  # on it with the given object, returning the result.
+  def self.serialize(obj)
+    serializer = RocketAMF::Serializer.new(RocketAMF::CLASS_MAPPER.new)
+    serializer.serialize(obj)
   end
 
-  # We use const_missing to define the active ClassMapper at runtime. This way,
-  # heavy modification of class mapping functionality is still possible without
-  # forcing extenders to redefine the constant.
-  def self.const_missing const #:nodoc:
-    if const == :ClassMapper
-      RocketAMF.const_set(:ClassMapper, RocketAMF::ClassMapping)
-    else
-      super(const)
-    end
-  end
 
-  # The base exception for AMF errors.
-  class AMFError < StandardError; end
 end

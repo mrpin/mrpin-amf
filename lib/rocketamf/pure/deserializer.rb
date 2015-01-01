@@ -1,182 +1,80 @@
-require 'rocketamf/pure/io_helpers'
+require 'rocketamf/pure/helpers/io_helper_read'
 
 module RocketAMF
   module Pure
-    # Pure ruby deserializer for AMF0 and AMF3
+    # Pure ruby deserializer for AMF3 requests
     class Deserializer
-      attr_accessor :source
+
+      #
+      # Modules
+      #
+      private
+      include RocketAMF::Pure::IOHelperRead
+
+      #
+      # Properties
+      #
+
+      public
+      attr_reader :source
 
       # Pass in the class mapper instance to use when deserializing. This
       # enables better caching behavior in the class mapper and allows
       # one to change mappings between deserialization attempts.
+      public
       def initialize(class_mapper)
         @class_mapper = class_mapper
       end
 
-      # Deserialize the source using AMF0 or AMF3. Source should either
+      # Deserialize the source using AMF3. Source should either
       # be a string or StringIO object. If you pass a StringIO object,
       # it will have its position updated to the end of the deserialized
       # data.
-      def deserialize(version, source)
-        result = []
+      # raise AMFError if error appeared in deserialize, source is nil
+      # return hash {requests: [], incomplete_request: String}
+      public
+      def deserialize(source)
+        raise AMFError, 'no source to deserialize' if source.nil?
 
-        @version = version
+        @source = source.is_a?(StringIO) ? source : StringIO.new(source)
 
-        if source.is_a?(StringIO)
-          @source = source
-        elsif source
-          @source = StringIO.new(source)
-        elsif @source.nil?
-          raise AMFError, 'no source to deserialize'
+        requests = []
+
+        incomplete_request = nil
+
+        until @source.eof?
+          begin
+            @string_cache = []
+            @object_cache = []
+            @trait_cache  = []
+
+            @position_request_read = @source.pos
+
+            requests << amf3_deserialize
+          rescue AMFErrorIncomplete => e
+            @source.pos = @position_request_read
+
+            incomplete_request = @source.read
+
+            break
+          end
         end
 
-        case @version
-          when 0
-            until @source.eof?
-              @ref_cache = []
-              result << amf0_deserialize
-            end
-          when 3
-            until @source.eof?
-              @string_cache = []
-              @object_cache = []
-              @trait_cache  = []
-              result << amf3_deserialize
-            end
-          else
-            raise ArgumentError, "unsupported version #{version}"
-        end
-
-        result
+        {
+            requests:           requests,
+            incomplete_request: incomplete_request
+        }
       end
 
-      # Reads an object from the deserializer's stream and returns it.
+      # Reads an object from the deserializer stream and returns it.
+      public
       def read_object
-        @version == 0 ? amf0_deserialize : amf3_deserialize
+        amf3_deserialize
       end
 
       private
-      include RocketAMF::Pure::ReadIOHelpers
-
-      def amf0_deserialize(type = nil)
-        type = read_int8 @source unless type
-        case type
-          when AMF0_NUMBER_MARKER
-            amf0_read_number
-          when AMF0_BOOLEAN_MARKER
-            amf0_read_boolean
-          when AMF0_STRING_MARKER
-            amf0_read_string
-          when AMF0_OBJECT_MARKER
-            amf0_read_object
-          when AMF0_NULL_MARKER
-            nil
-          when AMF0_UNDEFINED_MARKER
-            nil
-          when AMF0_REFERENCE_MARKER
-            amf0_read_reference
-          when AMF0_HASH_MARKER
-            amf0_read_hash
-          when AMF0_STRICT_ARRAY_MARKER
-            amf0_read_array
-          when AMF0_DATE_MARKER
-            amf0_read_date
-          when AMF0_LONG_STRING_MARKER
-            amf0_read_string true
-          when AMF0_UNSUPPORTED_MARKER
-            nil
-          when AMF0_XML_MARKER
-            amf0_read_string true
-          when AMF0_TYPED_OBJECT_MARKER
-            amf0_read_typed_object
-          when AMF0_AMF3_MARKER
-            deserialize(3, nil)
-          else
-            raise AMFError, "Invalid type: #{type}"
-        end
-      end
-
-      def amf0_read_number
-        result = read_double @source
-        (result.is_a?(Float) && result.nan?) ? nil : result # check for NaN and convert them to nil
-      end
-
-      def amf0_read_boolean
-        read_int8(@source) != 0
-      end
-
-      def amf0_read_string(long=false)
-        len    = long ? read_word32_network(@source) : read_word16_network(@source)
-        result = @source.read(len)
-        result.force_encoding('UTF-8') if result.respond_to?(:force_encoding)
-        result
-      end
-
-      def amf0_read_reference
-        index = read_word16_network(@source)
-        @ref_cache[index]
-      end
-
-      def amf0_read_array
-        len    = read_word32_network(@source)
-        result = []
-        @ref_cache << result
-
-        0.upto(len - 1) do
-          result << amf0_deserialize
-        end
-        result
-      end
-
-      def amf0_read_date
-        seconds = read_double(@source).to_f/1000
-        time    = Time.at(seconds)
-        tz      = read_word16_network(@source) # Unused
-        time
-      end
-
-      def amf0_read_props(obj = {})
-        while true
-          key  = amf0_read_string
-          type = read_int8 @source
-          break if type == AMF0_OBJECT_END_MARKER
-          obj[key] = amf0_deserialize(type)
-        end
-        obj
-      end
-
-      def amf0_read_hash
-        len = read_word32_network(@source) # Read and ignore length
-        obj = {}
-        @ref_cache << obj
-        amf0_read_props obj
-      end
-
-      def amf0_read_object add_to_ref_cache=true
-        # Create "object" and add to ref cache (it's always a Hash)
-        obj = @class_mapper.get_ruby_obj ""
-        @ref_cache << obj
-
-        # Populate object
-        props = amf0_read_props
-        @class_mapper.populate_ruby_obj obj, props
-        return obj
-      end
-
-      def amf0_read_typed_object
-        # Create object to add to ref cache
-        class_name = amf0_read_string
-        obj        = @class_mapper.get_ruby_obj class_name
-        @ref_cache << obj
-
-        # Populate object
-        props = amf0_read_props
-        @class_mapper.populate_ruby_obj obj, props
-        return obj
-      end
-
       def amf3_deserialize
-        type = read_int8 @source
+        type = read_int8(@source)
         case type
           when AMF3_UNDEFINED_MARKER
             nil
@@ -203,7 +101,7 @@ module RocketAMF
           when AMF3_BYTE_ARRAY_MARKER
             amf3_read_byte_array
           when AMF3_VECTOR_INT_MARKER, AMF3_VECTOR_UINT_MARKER, AMF3_VECTOR_DOUBLE_MARKER, AMF3_VECTOR_OBJECT_MARKER
-            amf3_read_vector type
+            amf3_read_vector(type)
           when AMF3_DICT_MARKER
             amf3_read_dict
           else
@@ -211,12 +109,38 @@ module RocketAMF
         end
       end
 
+      private
+      def get_as_reference_object(type)
+        result = nil
+
+        if (type & 0x01) == 0 #is reference?
+          reference = type >> 1
+          result    = @object_cache[reference]
+        end
+
+        result
+      end
+
+      private
+      def get_as_reference_string(type)
+        result = nil
+
+        if (type & 0x01) == 0 #is reference?
+          reference = type >> 1
+          result    = @string_cache[reference]
+        end
+
+        result
+      end
+
+      private
       def amf3_read_integer
-        n      = 0
-        b      = read_word8(@source) || 0
         result = 0
 
-        while ((b & 0x80) != 0 && n < 3)
+        n = 0
+        b = read_word8(@source) || 0
+
+        while (b & 0x80) != 0 && n < 3
           result = result << 7
           result = result | (b & 0x7f)
           b      = read_word8(@source) || 0
@@ -236,103 +160,135 @@ module RocketAMF
             result -= (1 << 29)
           end
         end
+
         result
       end
 
+      private
       def amf3_read_number
-        res = read_double @source
-        (res.is_a?(Float) && res.nan?) ? nil : res # check for NaN and convert them to nil
-      end
+        result = read_double(@source)
 
-      def amf3_read_string
-        type         = amf3_read_integer
-        is_reference = (type & 0x01) == 0
-
-        if is_reference
-          reference = type >> 1
-          return @string_cache[reference]
-        else
-          length = type >> 1
-          str    = ''
-          if length > 0
-            str = @source.read(length)
-            str.force_encoding('UTF-8') if str.respond_to?(:force_encoding)
-            @string_cache << str
-          end
-          return str
+        #check for NaN and convert them to nil
+        if result.is_a?(Float) && result.nan?
+          result = nil
         end
+
+        result
       end
 
+      private
+      def amf3_read_string
+        result = nil
+
+        type = amf3_read_integer
+
+        result = get_as_reference_string(type)
+
+        if result.nil?
+          length = type >> 1
+          result = ''
+
+          if length > 0
+
+            if length > (@source.size - @source.pos)
+              raise AMFErrorIncomplete.new
+            end
+
+            result = @source.read(length)
+            result.force_encoding('UTF-8') if result.respond_to?(:force_encoding)
+            @string_cache << result
+          end
+        end
+
+        result
+      end
+
+      private
       def amf3_read_xml
         result = nil
 
-        type         = amf3_read_integer
-        is_reference = (type & 0x01) == 0
+        type = amf3_read_integer
 
-        if is_reference
-          reference = type >> 1
-          result    = @object_cache[reference]
-        else
+        result = get_as_reference_object(type)
+
+        if result.nil?
           length = type >> 1
-          str    = ""
+
+          result = ''
+
           if length > 0
-            str = @source.read(length)
-            str.force_encoding("UTF-8") if str.respond_to?(:force_encoding)
-            @object_cache << str
+            if length > (@source.size - @source.pos)
+              raise AMFErrorIncomplete.new
+            end
+
+            result = @source.read(length)
+            result.force_encoding('UTF-8') if result.respond_to?(:force_encoding)
+            @object_cache << result
           end
-          result = str
         end
 
         result
       end
 
+      private
       def amf3_read_byte_array
-        type         = amf3_read_integer
-        is_reference = (type & 0x01) == 0
+        result = nil
 
-        if is_reference
-          reference = type >> 1
-          return @object_cache[reference]
-        else
+        type = amf3_read_integer
+
+        result = get_as_reference_object(type)
+
+        if result.nil?
           length = type >> 1
-          obj    = StringIO.new @source.read(length)
-          @object_cache << obj
-          obj
+
+          if length > (@source.size - @source.pos)
+            raise AMFErrorIncomplete.new
+          end
+
+          result = StringIO.new(@source.read(length))
+          @object_cache << result
         end
+
+        result
       end
 
+      private
       def amf3_read_array
-        type         = amf3_read_integer
-        is_reference = (type & 0x01) == 0
+        result = nil
 
-        if is_reference
-          reference = type >> 1
-          return @object_cache[reference]
-        else
+        type = amf3_read_integer
+
+        result = get_as_reference_object(type)
+
+        if result.nil?
           length        = type >> 1
           property_name = amf3_read_string
-          array         = property_name.length > 0 ? {} : []
-          @object_cache << array
+          result        = property_name.length > 0 ? {} : []
+          @object_cache << result
 
           while property_name.length > 0
-            value                = amf3_deserialize
-            array[property_name] = value
-            property_name        = amf3_read_string
+            value                 = amf3_deserialize
+            result[property_name] = value
+            property_name         = amf3_read_string
           end
-          0.upto(length - 1) { |i| array[i] = amf3_deserialize }
 
-          array
+          0.upto(length - 1) { |i| result[i] = amf3_deserialize }
         end
+
+        result
       end
 
+      # externalizable - an instance of a Class that implements flash.utils.IExternalizable and completely controls the serialization of its members (no property names are included in the trait information)
+      # dynamic - c an instance of a Class definition with the dynamic trait declared; public variable members can be added and removed from instances dynamically at runtime
+      private
       def amf3_read_object
-        type         = amf3_read_integer
-        is_reference = (type & 0x01) == 0
+        result = nil
 
-        if is_reference
-          reference = type >> 1
-          return @object_cache[reference]
-        else
+        type = amf3_read_integer
+
+        result = get_as_reference_object(type)
+
+        if result.nil?
           class_type         = type >> 1
           class_is_reference = (class_type & 0x01) == 0
 
@@ -359,108 +315,124 @@ module RocketAMF
           end
 
           # Optimization for deserializing ArrayCollection
-          if traits[:class_name] == "flex.messaging.io.ArrayCollection"
-            arr = amf3_deserialize # Adds ArrayCollection array to object cache
-            @object_cache << arr # Add again for ArrayCollection source array
-            return arr
+          if traits[:class_name] == 'flex.messaging.io.ArrayCollection'
+            result = amf3_deserialize # Adds ArrayCollection array to object cache
+            @object_cache << result # Add again for ArrayCollection source array
+            return result
           end
 
-          obj = @class_mapper.get_ruby_obj traits[:class_name]
-          @object_cache << obj
+          result = @class_mapper.get_ruby_obj(traits[:class_name])
+          @object_cache << result
 
           if traits[:externalizable]
-            obj.read_external self
+            result.read_external(self)
           else
-            props = {}
+            properties = {}
+
             traits[:members].each do |key|
-              value      = amf3_deserialize
-              props[key] = value
+              value           = amf3_deserialize
+              properties[key] = value
             end
 
-            dynamic_props = nil
             if traits[:dynamic]
-              dynamic_props = {}
               while (key = amf3_read_string) && key.length != 0 do # read next key
-                value              = amf3_deserialize
-                dynamic_props[key] = value
+                value           = amf3_deserialize
+                properties[key] = value
               end
             end
 
-            @class_mapper.populate_ruby_obj obj, props, dynamic_props
+            @class_mapper.populate_ruby_obj(result, properties)
           end
-          obj
+
         end
+
+        result
       end
 
+      private
       def amf3_read_date
-        type         = amf3_read_integer
-        is_reference = (type & 0x01) == 0
-        if is_reference
-          reference = type >> 1
-          return @object_cache[reference]
-        else
+        result = nil
+
+        type = amf3_read_integer
+
+        result = get_as_reference_object(type)
+
+        if result.nil?
           seconds = read_double(@source).to_f/1000
-          time    = Time.at(seconds)
-          @object_cache << time
-          time
+          result  = Time.at(seconds)
+          @object_cache << result
         end
+
+        result
       end
 
+      private
       def amf3_read_dict
-        type         = amf3_read_integer
-        is_reference = (type & 0x01) == 0
-        if is_reference
-          reference = type >> 1
-          return @object_cache[reference]
-        else
-          dict = {}
-          @object_cache << dict
+        result = nil
+
+        type = amf3_read_integer
+
+        result = get_as_reference_object(type)
+
+        if result.nil?
+          result = {}
+          @object_cache << result
           length    = type >> 1
-          weak_keys = read_int8 @source # Ignore: Not supported in ruby
+          weak_keys = read_int8(@source) # Ignore: Not supported in ruby
+
           0.upto(length - 1) do |i|
-            dict[amf3_deserialize] = amf3_deserialize
+            result[amf3_deserialize] = amf3_deserialize
           end
-          dict
+
         end
+
+        result
       end
 
-      def amf3_read_vector vector_type
-        type         = amf3_read_integer
-        is_reference = (type & 0x01) == 0
-        if is_reference
-          reference = type >> 1
-          return @object_cache[reference]
-        else
-          vec = []
-          @object_cache << vec
+      private
+      def amf3_read_vector(vector_type)
+        result = nil
+
+        type = amf3_read_integer
+
+        result = get_as_reference_object(type)
+
+        if result.nil?
+
+          result = []
+          @object_cache << result
+
           length       = type >> 1
-          fixed_vector = read_int8 @source # Ignore
+          fixed_vector = read_int8(@source) # Ignore
+
           case vector_type
             when AMF3_VECTOR_INT_MARKER
               0.upto(length - 1) do |i|
                 int = read_word32_network(@source)
                 int = int - 2**32 if int > MAX_INTEGER
-                vec << int
+                result << int
               end
             when AMF3_VECTOR_UINT_MARKER
               0.upto(length - 1) do |i|
-                vec << read_word32_network(@source)
-                puts vec[i].to_s(2)
+                result << read_word32_network(@source)
               end
             when AMF3_VECTOR_DOUBLE_MARKER
               0.upto(length - 1) do |i|
-                vec << amf3_read_number
+                result << amf3_read_number
               end
             when AMF3_VECTOR_OBJECT_MARKER
               vector_class = amf3_read_string # Ignore
-              puts vector_class
               0.upto(length - 1) do |i|
-                vec << amf3_deserialize
+                result << amf3_deserialize
               end
+            else
+              #do nothing
           end
-          vec
-        end
-      end
-    end
-  end
+        end #if
+
+        result
+      end #read_vector
+
+    end #Deserializer
+  end #Pure
 end

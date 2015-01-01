@@ -180,5 +180,5 @@ void Init_rocket_amf_remoting() {
     id_data = rb_intern("data");
     cRocketAMFHeader = rb_const_get(mRocketAMF, rb_intern("Header"));
     cRocketAMFMessage = rb_const_get(mRocketAMF, rb_intern("Message"));
-    cRocketAMFAbstractMessage = rb_const_get(rb_const_get(mRocketAMF, rb_intern("Values")), rb_intern("AbstractMessage"));
+    cRocketAMFAbstractMessage = rb_const_get(rb_const_get(mRocketAMF, rb_intern("Types")), rb_intern("AbstractMessage"));
 }

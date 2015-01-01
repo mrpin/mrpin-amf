@@ -1,22 +1,33 @@
 # -*- encoding: utf-8 -*-
 
-Gem::Specification.new do |s|
-  s.name    = 'mrpin-rocketamf'
-  s.version = '1.0.4'
-  s.platform = Gem::Platform::RUBY
-  s.authors  = ['Jacob Henry', 'Stephen Augenstein', "Joc O'Connor"]
-  s.email    = ['perl.programmer@gmail.com']
-  s.homepage = 'https://github.com/mrpin/mrpin-rocketamf'
-  s.summary = 'Fast AMF serializer/deserializer with remoting request/response wrappers to simplify integration'
+Gem::Specification.new do |spec|
+  spec.name        = 'mrpin-rocketamf'
+  spec.version     = '2.0.0'
+  spec.platform    = Gem::Platform::RUBY
+  spec.authors     = ['Jacob Henry', 'Stephen Augenstein', "Joc O'Connor", 'Gregory Tkach']
+  spec.email       = %w(gregory.tkach@gmail.com)
+  spec.homepage    = 'https://github.com/mrpin/mrpin-rocketamf'
+  spec.license     = 'MIT'
+  spec.summary     = 'Fast AMF3 serializer/deserializer'
+  spec.description = 'Fast AMF3 serializer/deserializer with remoting request/response wrappers to simplify integration'
 
-  s.files         = Dir[*['README.rdoc', 'benchmark.rb', 'mrpin-rocketamf.gemspec', 'Rakefile', 'lib/**/*.rb', 'spec/**/*.{rb,bin,opts}', 'ext/**/*.{c,h,rb}']]
-  s.test_files    = Dir[*['spec/**/*_spec.rb']]
-  s.extensions    = Dir[*["ext/**/extconf.rb"]]
-  s.require_paths = ["lib"]
+  files = []
+  files << 'README.rdoc'
+  files << 'benchmark.rb'
+  files << 'mrpin-rocketamf.gemspec'
+  files << 'Rakefile'
+  files << 'lib/**/*.rb'
+  files << 'spec/**/*.{rb,bin,opts}'
+  files << 'ext/**/*.{c,h,rb}'
 
-  s.add_development_dependency 'rake-compiler'
+  spec.files         = Dir[*files]
+  spec.test_files    = Dir[*['spec/**/*_spec.rb']]
+  spec.extensions    = Dir[*['ext/**/extconf.rb']]
+  spec.require_paths = ['lib']
 
-  s.has_rdoc         = true
-  s.extra_rdoc_files = ['README.rdoc']
-  s.rdoc_options     = ['--line-numbers', '--main', 'README.rdoc']
+  spec.add_development_dependency 'rake-compiler', '~> 0'
+
+  spec.has_rdoc         = true
+  spec.extra_rdoc_files = %w( README.rdoc )
+  spec.rdoc_options     = %w(--line-numbers --main README.rdoc)
 end

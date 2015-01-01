@@ -6,7 +6,7 @@ require 'rocketamf/pure/deserializer' # Only ext gets included by default if ava
 require 'rocketamf/pure/serializer'
 
 OBJECT_COUNT = 100000
-TESTS = 5
+TESTS        = 5
 
 class TestClass
   attr_accessor :prop_a, :prop_b, :prop_c, :prop_d, :prop_e
@@ -28,47 +28,54 @@ OBJECT_COUNT.times do
   objs << TestClass.new.populate
 end
 
-["native", "pure"].each do |type|
+%w(native pure).each do |type|
+
+  use_ruby_version = type == 'pure'
+
   # Set up class mapper
-  cm = if type == "pure"
-    RocketAMF::ClassMapping
+  class_mapper     = nil
+
+  if use_ruby_version
+    class_mapper = RocketAMF::ClassMapping
   else
-    RocketAMF::Ext::FastClassMapping
-  end
-  cm.define do |m|
-    m.map :as => 'TestClass', :ruby => 'TestClass'
+    class_mapper = RocketAMF::Ext::FastClassMapping
   end
 
-  [0, 3].each do |version|
-    # 2**24 is larger than anyone is ever going to run this for
-    min_serialize = 2**24
-    min_deserialize = 2**24
+  class_mapper.define do |m|
+    m.map as: 'TestClass', ruby: 'TestClass'
+  end
 
-    puts "Testing #{type} AMF#{version}:"
-    TESTS.times do
-      ser = if type == "pure"
-        RocketAMF::Pure::Serializer.new(cm.new)
-      else
-        RocketAMF::Ext::Serializer.new(cm.new)
-      end
-      start_time = Time.now
-      out = ser.serialize(version, objs)
-      end_time = Time.now
-      puts "\tserialize run: #{end_time-start_time}s"
-      min_serialize = [end_time-start_time, min_serialize].min
 
-      des = if type == "pure"
-        RocketAMF::Pure::Deserializer.new(cm.new)
-      else
-        RocketAMF::Ext::Deserializer.new(cm.new)
-      end
-      start_time = Time.now
-      temp = des.deserialize(version, out)
-      end_time = Time.now
-      puts "\tdeserialize run: #{end_time-start_time}s"
-      min_deserialize = [end_time-start_time, min_deserialize].min
+  # 2**24 is larger than anyone is ever going to run this for
+  min_serialize   = 2**24
+  min_deserialize = 2**24
+
+  puts "Testing #{type} AMF3"
+  TESTS.times do
+    serializer   = nil
+    deserializer = nil
+
+    if use_ruby_version
+      serializer   = RocketAMF::Pure::Serializer.new(class_mapper.new)
+      deserializer = RocketAMF::Pure::Deserializer.new(class_mapper.new)
+    else
+      serializer   = RocketAMF::Ext::Serializer.new(class_mapper.new)
+      deserializer = RocketAMF::Ext::Deserializer.new(class_mapper.new)
     end
-    puts "\tminimum serialize time: #{min_serialize}s"
-    puts "\tminimum deserialize time: #{min_deserialize}s"
+
+    start_time = Time.now
+    out        = serializer.serialize(objs)
+    end_time   = Time.now
+    puts "\tserialize run: #{end_time-start_time}s"
+    min_serialize = [end_time-start_time, min_serialize].min
+
+    start_time = Time.now
+    temp       = deserializer.deserialize(out)
+    end_time   = Time.now
+    puts "\tdeserialize run: #{end_time-start_time}s"
+    min_deserialize = [end_time-start_time, min_deserialize].min
   end
+
+  puts "\tminimum serialize time: #{min_serialize}s"
+  puts "\tminimum deserialize time: #{min_deserialize}s"
 end
