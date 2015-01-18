@@ -1,15 +1,16 @@
 # -*- encoding: utf-8 -*-
 
 Gem::Specification.new do |spec|
-  spec.name        = 'mrpin-amf'
-  spec.version     = '2.0.2'
-  spec.platform    = Gem::Platform::RUBY
-  spec.authors     = ['Jacob Henry', 'Stephen Augenstein', "Joc O'Connor", 'Gregory Tkach']
-  spec.email       = %w(gregory.tkach@gmail.com)
-  spec.homepage    = 'https://github.com/mrpin/mrpin-amf'
-  spec.license     = 'MIT'
-  spec.summary     = 'Fast AMF3 serializer/deserializer'
-  spec.description = 'Fast AMF3 serializer/deserializer with remoting request/response wrappers to simplify integration'
+  spec.name                          = 'mrpin-amf'
+  spec.version                       = '2.0.2'
+  spec.platform                      = Gem::Platform::RUBY
+  spec.authors                       = ['Jacob Henry', 'Stephen Augenstein', "Joc O'Connor", 'Gregory Tkach']
+  spec.email                         = %w(gregory.tkach@gmail.com)
+  spec.homepage                      = 'https://github.com/mrpin/mrpin-amf'
+  spec.license                       = 'MIT'
+  spec.summary                       = 'Fast AMF3 serializer/deserializer'
+  spec.description                   = 'Fast AMF3 serializer/deserializer with remoting request/response wrappers to simplify integration'
+  spec.metadata['allowed_push_host'] = 'http://gems.mr-pin.net'
 
   spec.files         = `git ls-files`.split($/)
   spec.test_files    = Dir[*['spec/**/*_spec.rb']]
