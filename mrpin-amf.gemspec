@@ -10,7 +10,6 @@ Gem::Specification.new do |spec|
   spec.license                       = 'MIT'
   spec.summary                       = 'Fast AMF3 serializer/deserializer'
   spec.description                   = 'Fast AMF3 serializer/deserializer with remoting request/response wrappers to simplify integration'
-  spec.metadata['allowed_push_host'] = 'http://gems.mr-pin.net'
 
   spec.files         = `git ls-files`.split($/)
   spec.test_files    = Dir[*['spec/**/*_spec.rb']]
