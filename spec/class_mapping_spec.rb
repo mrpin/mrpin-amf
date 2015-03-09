@@ -1,29 +1,28 @@
 require 'spec_helper.rb'
 
-describe RocketAMF::ClassMapping do
+describe AMF::ClassMapping do
   before :each do
-    RocketAMF::ClassMapping.reset
-    RocketAMF::ClassMapping.define do |m|
+    AMF::ClassMapping.reset
+    AMF::ClassMapping.define do |m|
       m.map as: 'ASClass', ruby: 'ClassMappingTest'
     end
-    @mapper = RocketAMF::ClassMapping.new
+    @mapper = AMF::ClassMapping.new
   end
 
   describe 'class name mapping' do
     it 'should allow resetting of mappings back to defaults' do
       expect(@mapper.get_as_class_name('ClassMappingTest')).not_to be_nil
 
-      RocketAMF::ClassMapping.reset
+      AMF::ClassMapping.reset
 
-      @mapper = RocketAMF::ClassMapping.new
+      @mapper = AMF::ClassMapping.new
       expect(@mapper.get_as_class_name('ClassMappingTest')).to be_nil
-      expect(@mapper.get_as_class_name('RocketAMF::Types::AcknowledgeMessage')).not_to be_nil
     end
 
     it 'should return AS class name for ruby objects' do
       expect(@mapper.get_as_class_name(ClassMappingTest.new)).to eq('ASClass')
       expect(@mapper.get_as_class_name('ClassMappingTest')).to eq('ASClass')
-      expect(@mapper.get_as_class_name(RocketAMF::Types::TypedHash.new('ClassMappingTest'))).to eq('ASClass')
+      expect(@mapper.get_as_class_name(AMF::Types::TypedHash.new('ClassMappingTest'))).to eq('ASClass')
       expect(@mapper.get_as_class_name('BadClass')).to be_nil
     end
 
@@ -32,8 +31,8 @@ describe RocketAMF::ClassMapping do
     end
 
     it 'should properly instantiate namespaced classes' do
-      RocketAMF::ClassMapping.mappings.map as: 'ASClass', ruby: 'ANamespace::TestRubyClass'
-      @mapper = RocketAMF::ClassMapping.new
+      AMF::ClassMapping.mappings.map as: 'ASClass', ruby: 'ANamespace::TestRubyClass'
+      @mapper = AMF::ClassMapping.new
 
       expect(@mapper.get_ruby_obj('ASClass')).to be_a(ANamespace::TestRubyClass)
     end
@@ -41,28 +40,23 @@ describe RocketAMF::ClassMapping do
     it 'should return a hash with original type if not mapped' do
       obj = @mapper.get_ruby_obj('UnmappedClass')
 
-      expect(obj).to be_a(RocketAMF::Types::TypedHash)
+      expect(obj).to be_a(AMF::Types::TypedHash)
       expect(obj.type).to eq('UnmappedClass')
     end
 
     it 'should map special classes from AS by default' do
       as_classes =
-          %w(
-              flex.messaging.messages.AcknowledgeMessage
-              flex.messaging.messages.CommandMessage
-              flex.messaging.messages.RemotingMessage
-            )
+          %w( )
 
       as_classes.each do |as_class|
-        expect(@mapper.get_ruby_obj(as_class)).not_to be_a(RocketAMF::Types::TypedHash)
+        expect(@mapper.get_ruby_obj(as_class)).not_to be_a(AMF::Types::TypedHash)
       end
     end
 
     it 'should map special classes from ruby by default' do
       ruby_classes =
           %w(
-              RocketAMF::Types::AcknowledgeMessage
-              RocketAMF::Types::ErrorMessage
+              AMF::Types::ErrorMessage
             )
 
       ruby_classes.each do |obj|
@@ -71,8 +65,8 @@ describe RocketAMF::ClassMapping do
     end
 
     it 'should allow config modification' do
-      RocketAMF::ClassMapping.mappings.map as: 'SecondClass', ruby: 'ClassMappingTest'
-      @mapper = RocketAMF::ClassMapping.new
+      AMF::ClassMapping.mappings.map as: 'SecondClass', ruby: 'ClassMappingTest'
+      @mapper = AMF::ClassMapping.new
 
       expect(@mapper.get_as_class_name(ClassMappingTest.new)).to eq('SecondClass')
     end
@@ -85,7 +79,7 @@ describe RocketAMF::ClassMapping do
     end
 
     it 'should populate a typed hash' do
-      obj = @mapper.populate_ruby_obj RocketAMF::Types::TypedHash.new('UnmappedClass'), {prop_a: 'Data'}
+      obj = @mapper.populate_ruby_obj AMF::Types::TypedHash.new('UnmappedClass'), {prop_a: 'Data'}
       expect(obj[:prop_a]).to eq('Data')
     end
   end

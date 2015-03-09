@@ -1,27 +1,26 @@
 require 'spec_helper.rb'
 
-describe RocketAMF::Ext::FastClassMapping do
+describe AMF::Ext::FastClassMapping do
   before :each do
-    RocketAMF::Ext::FastClassMapping.reset
-    RocketAMF::Ext::FastClassMapping.define do |m|
+    AMF::Ext::FastClassMapping.reset
+    AMF::Ext::FastClassMapping.define do |m|
       m.map :as => 'ASClass', ruby: 'ClassMappingTest'
     end
-    @mapper = RocketAMF::Ext::FastClassMapping.new
+    @mapper = AMF::Ext::FastClassMapping.new
   end
 
   describe 'class name mapping' do
     it 'should allow resetting of mappings back to defaults' do
       @mapper.get_as_class_name('ClassMappingTest').should_not be_nil
-      RocketAMF::Ext::FastClassMapping.reset
-      @mapper = RocketAMF::Ext::FastClassMapping.new
+      AMF::Ext::FastClassMapping.reset
+      @mapper = AMF::Ext::FastClassMapping.new
       @mapper.get_as_class_name('ClassMappingTest').should be_nil
-      @mapper.get_as_class_name('RocketAMF::Types::AcknowledgeMessage').should_not be_nil
     end
 
     it 'should return AS class name for ruby objects' do
       @mapper.get_as_class_name(ClassMappingTest.new).should == 'ASClass'
       @mapper.get_as_class_name('ClassMappingTest').should == 'ASClass'
-      @mapper.get_as_class_name(RocketAMF::Types::TypedHash.new('ClassMappingTest')).should == 'ASClass'
+      @mapper.get_as_class_name(AMF::Types::TypedHash.new('ClassMappingTest')).should == 'ASClass'
       @mapper.get_as_class_name('BadClass').should be_nil
     end
 
@@ -30,35 +29,33 @@ describe RocketAMF::Ext::FastClassMapping do
     end
 
     it 'should properly instantiate namespaced classes' do
-      RocketAMF::Ext::FastClassMapping.mappings.map :as => 'ASClass', ruby: 'ANamespace::TestRubyClass'
-      @mapper = RocketAMF::Ext::FastClassMapping.new
+      AMF::Ext::FastClassMapping.mappings.map :as => 'ASClass', ruby: 'ANamespace::TestRubyClass'
+      @mapper = AMF::Ext::FastClassMapping.new
       @mapper.get_ruby_obj('ASClass').should be_a(ANamespace::TestRubyClass)
     end
 
     it 'should return a hash with original type if not mapped' do
       obj = @mapper.get_ruby_obj('UnmappedClass')
-      obj.should be_a(RocketAMF::Types::TypedHash)
+      obj.should be_a(AMF::Types::TypedHash)
       obj.type.should == 'UnmappedClass'
     end
 
     it 'should map special classes from AS by default' do
       as_classes =
           %w(
-              flex.messaging.messages.AcknowledgeMessage
               flex.messaging.messages.CommandMessage
               flex.messaging.messages.RemotingMessage
             )
 
       as_classes.each do |as_class|
-        @mapper.get_ruby_obj(as_class).should_not be_a(RocketAMF::Types::TypedHash)
+        @mapper.get_ruby_obj(as_class).should_not be_a(AMF::Types::TypedHash)
       end
     end
 
     it 'should map special classes from ruby by default' do
       ruby_classes =
           %w(
-              RocketAMF::Types::AcknowledgeMessage
-              RocketAMF::Types::ErrorMessage
+              AMF::Types::ErrorMessage
             )
 
       ruby_classes.each do |obj|
@@ -67,8 +64,8 @@ describe RocketAMF::Ext::FastClassMapping do
     end
 
     it 'should allow config modification' do
-      RocketAMF::Ext::FastClassMapping.mappings.map :as => 'SecondClass', ruby: 'ClassMappingTest'
-      @mapper = RocketAMF::Ext::FastClassMapping.new
+      AMF::Ext::FastClassMapping.mappings.map :as => 'SecondClass', ruby: 'ClassMappingTest'
+      @mapper = AMF::Ext::FastClassMapping.new
       @mapper.get_as_class_name(ClassMappingTest.new).should == 'SecondClass'
     end
   end
@@ -80,7 +77,7 @@ describe RocketAMF::Ext::FastClassMapping do
     end
 
     it 'should populate a typed hash' do
-      obj = @mapper.populate_ruby_obj RocketAMF::Types::TypedHash.new('UnmappedClass'), {'prop_a' => 'Data'}
+      obj = @mapper.populate_ruby_obj AMF::Types::TypedHash.new('UnmappedClass'), {'prop_a' => 'Data'}
       obj['prop_a'].should == 'Data'
     end
   end
@@ -132,7 +129,7 @@ describe RocketAMF::Ext::FastClassMapping do
       # Add a method to ClassMappingTest3
       class ClassMappingTest3;
         attr_accessor :prop_b;
-      end;
+      end
 
       # Test property list does not have new property
       obj        = ClassMappingTest3.new
@@ -142,7 +139,7 @@ describe RocketAMF::Ext::FastClassMapping do
       hash.should == prop_hash({'prop_a' => 'Test A'})
 
       # Test that new class mapper *does* have new property (cache per instance)
-      @mapper = RocketAMF::Ext::FastClassMapping.new
+      @mapper = AMF::Ext::FastClassMapping.new
       hash    = @mapper.props_for_serialization obj
       hash.should == prop_hash({'prop_a' => 'Test A', 'prop_b' => 'Test B'})
     end

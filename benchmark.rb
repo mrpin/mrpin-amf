@@ -1,20 +1,24 @@
 $:.unshift(File.dirname(__FILE__) + '/ext')
 $:.unshift(File.dirname(__FILE__) + '/lib')
 require 'rubygems'
-require 'rocketamf'
-require 'rocketamf/pure/deserializer' # Only ext gets included by default if available
-require 'rocketamf/pure/serializer'
+require 'amf'
+require 'amf/pure/deserializer' # Only ext gets included by default if available
+require 'amf/pure/serializer'
 
 OBJECT_COUNT = 100000
 TESTS        = 5
 
 class TestClass
-  attr_accessor :prop_a, :prop_b, :prop_c, :prop_d, :prop_e
+  attr_accessor :prop_a
+  attr_accessor :prop_b
+  attr_accessor :prop_c
+  attr_accessor :prop_d
+  attr_accessor :prop_e
 
   def populate(some_arg = nil) # Make sure class mapper doesn't think populate is a property
     @@count ||= 1
     @prop_a = "asdfasdf #{@@count}"
-    @prop_b = "simple string"
+    @prop_b = 'simple string'
     @prop_c = 3120094.03
     @prop_d = Time.now
     @prop_e = 3120094
@@ -37,9 +41,9 @@ end
   class_mapper     = nil
 
   if use_ruby_version
-    class_mapper = RocketAMF::ClassMapping
+    class_mapper = AMF::ClassMapping
   else
-    class_mapper = RocketAMF::Ext::FastClassMapping
+    class_mapper = AMF::Ext::FastClassMapping
   end
 
   class_mapper.define do |m|
@@ -57,11 +61,11 @@ end
     deserializer = nil
 
     if use_ruby_version
-      serializer   = RocketAMF::Pure::Serializer.new(class_mapper.new)
-      deserializer = RocketAMF::Pure::Deserializer.new(class_mapper.new)
+      serializer   = AMF::Pure::Serializer.new(class_mapper.new)
+      deserializer = AMF::Pure::Deserializer.new(class_mapper.new)
     else
-      serializer   = RocketAMF::Ext::Serializer.new(class_mapper.new)
-      deserializer = RocketAMF::Ext::Deserializer.new(class_mapper.new)
+      serializer   = AMF::Ext::Serializer.new(class_mapper.new)
+      deserializer = AMF::Ext::Deserializer.new(class_mapper.new)
     end
 
     start_time = Time.now

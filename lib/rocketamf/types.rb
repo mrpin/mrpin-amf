@@ -1,1 +1,0 @@
-require 'rocketamf/types/typed_hash'

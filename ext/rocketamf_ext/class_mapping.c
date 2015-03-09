@@ -94,7 +94,6 @@ static VALUE mapset_map_defaults(VALUE self) {
         "RocketAMF::Types::AsyncMessageExt",
         "RocketAMF::Types::CommandMessage",
         "RocketAMF::Types::CommandMessageExt",
-        "RocketAMF::Types::AcknowledgeMessage",
         "RocketAMF::Types::AcknowledgeMessageExt",
         "RocketAMF::Types::ErrorMessage"
     };

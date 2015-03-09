@@ -12,7 +12,7 @@ end
 
 def first_request_eq(object_fixture, value)
   input  = object_fixture(object_fixture)
-  output = RocketAMF.deserialize(input)
+  output = AMF.deserialize(input)
 
   request = output[:requests][0]
 
@@ -21,7 +21,7 @@ end
 
 def get_first_request(object_fixture)
   input  = object_fixture(object_fixture)
-  output = RocketAMF.deserialize(input)
+  output = AMF.deserialize(input)
 
   requests = output[:requests]
   requests[0]
