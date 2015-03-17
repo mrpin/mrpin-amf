@@ -1,6 +1,6 @@
 module AMF
   module Pure
-    class StringCache < Hash #:nodoc:
+    class CacheStrings < Hash #:nodoc:
       def initialize
         @cache_index = 0
       end

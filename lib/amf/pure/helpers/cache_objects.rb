@@ -1,6 +1,6 @@
 module AMF
   module Pure
-    class ObjectCache < Hash #:nodoc:
+    class CacheObjects < Hash #:nodoc:
       def initialize
         @cache_index    = 0
         @obj_references = []

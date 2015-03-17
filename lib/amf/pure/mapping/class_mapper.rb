@@ -10,8 +10,8 @@ module AMF
   # Example:
   #
   #   AMF::CLASS_MAPPER.define do |m|
-  #     m.map as: 'AsClass', ruby: 'RubyClass'
-  #     m.map as: 'vo.User', ruby: 'Model::User'
+  #     m.map remote: 'AsClass', local: 'RubyClass'
+  #     m.map remote: 'vo.User', local: 'Model::User'
   #   end
   #
   # == Object Population/Serialization
@@ -63,7 +63,7 @@ module AMF
   #   require 'amf'
   #todo:review
   #   AMF::ClassMapper = AMF::Ext::FastClassMapping
-  class ClassMapping
+  class ClassMapper
     class << self
       # Returns the mapping set with all the class mappings that is currently
       # being used.
@@ -77,7 +77,7 @@ module AMF
       # Example:
       #
       #   AMF::CLASS_MAPPER.define do |m|
-      #     m.map as: 'AsClass', ruby: 'RubyClass'
+      #     m.map remote: 'AsClass', local: 'RubyClass'
       #   end
       def define(&block) #:yields: mapping_set
         yield mappings
@@ -103,13 +103,13 @@ module AMF
       @mappings             = self.class.mappings
     end
 
-    # Returns the ActionScript class name for the given ruby object. Will also
+    # Returns the other-language class name for the given ruby object. Will also
     # take a string containing the ruby class name.
     def get_as_class_name(obj)
       # Get class name
       if obj.is_a?(String)
         ruby_class_name = obj
-      elsif obj.is_a?(Types::TypedHash)
+      elsif obj.is_a?(HashWithType)
         ruby_class_name = obj.type
       elsif obj.is_a?(Hash)
         return nil
@@ -131,7 +131,7 @@ module AMF
       ruby_class_name = @mappings.get_ruby_class_name(as_class_name)
       if ruby_class_name.nil?
         # Populate a simple hash, since no mapping
-        result = Types::TypedHash.new(as_class_name)
+        result = HashWithType.new(as_class_name)
       else
         ruby_class = ruby_class_name.split('::').inject(Kernel) { |scope, const_name| scope.const_get(const_name) }
         result     = ruby_class.new
@@ -145,7 +145,7 @@ module AMF
     def populate_ruby_obj(target, props)
 
       # Don't even bother checking if it responds to setter methods if it's a TypedHash
-      if target.is_a?(Types::TypedHash)
+      if target.is_a?(HashWithType)
         target.merge! props
         return target
       end
