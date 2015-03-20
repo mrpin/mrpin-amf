@@ -10,36 +10,39 @@ module AMF
     # Creates a mapping set object and populates the default mappings
     public
     def initialize
-      @as_mappings   = {}
-      @ruby_mappings = {}
+      @mappings_remote = {}
+      @mappings_local  = {}
     end
 
-    # Map a given AS class to a ruby class.
+    # Map a given other-language class to a ruby class.
     #
     # Use fully qualified names for both.
     #
     # Example:
     #
-    #   m.map as: 'com.example.Date', ruby: 'Example::Date'
+    #   register_class_alias('Example::Date', 'com.example.Date')
     public
-    def map(params)
-      [:as, :ruby].each { |k| params[k] = params[k].to_s } # Convert params to strings
-      @as_mappings[params[:as]]     = params[:ruby]
-      @ruby_mappings[params[:ruby]] = params[:as]
+    def register_class_alias(class_local, class_remote)
+      # Convert params to strings
+      class_remote = class_remote.to_s
+      class_local  = class_local.to_s
+
+      @mappings_remote[class_remote] = class_local
+      @mappings_local[class_local]   = class_remote
     end
 
-    # Returns the AS class name for the given ruby class name,
+    # Returns the ruby class name for the given other-language class name
     # returning nil if not found
     public
-    def get_as_class_name(class_name) #:nodoc:
-      @ruby_mappings[class_name.to_s]
+    def get_class_name_local(class_name) #:nodoc:
+      @mappings_remote[class_name.to_s]
     end
 
-    # Returns the ruby class name for the given AS class name
+    # Returns the other-language class name for the given ruby class name,
     # returning nil if not found
     public
-    def get_ruby_class_name(class_name) #:nodoc:
-      @as_mappings[class_name.to_s]
+    def get_class_name_remote(class_name) #:nodoc:
+      @mappings_local[class_name.to_s]
     end
   end
 

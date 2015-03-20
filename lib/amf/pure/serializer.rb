@@ -33,9 +33,9 @@ module AMF
       def serialize(obj)
         # Initialize caches
         if @depth == 0
-          @string_cache = StringCache.new
-          @object_cache = ObjectCache.new
-          @trait_cache  = StringCache.new
+          @cache_strings = CacheStrings.new
+          @cache_objects = CacheObjects.new
+          @cache_traits  = CacheStrings.new
         end
         @depth += 1
 
@@ -45,10 +45,9 @@ module AMF
         # Cleanup
         @depth -= 1
         if @depth == 0
-          @ref_cache    = nil
-          @string_cache = nil
-          @object_cache = nil
-          @trait_cache  = nil
+          @cache_strings = nil
+          @cache_objects = nil
+          @cache_traits  = nil
         end
 
         @stream
@@ -56,28 +55,31 @@ module AMF
 
       private
       def amf3_serialize(object)
-        if object.respond_to?(:encode_amf)
-          object.encode_amf(self)
-        elsif object.is_a?(NilClass)
-          amf3_write_null
-        elsif object.is_a?(TrueClass)
-          amf3_write_true
-        elsif object.is_a?(FalseClass)
-          amf3_write_false
-        elsif object.is_a?(Numeric)
-          amf3_write_numeric(object)
-        elsif object.is_a?(Symbol) || object.is_a?(String)
-          amf3_write_string(object.to_s)
-        elsif object.is_a?(Time)
-          amf3_write_time object
-        elsif object.is_a?(Date)
-          amf3_write_date(object)
-        elsif object.is_a?(StringIO)
-          amf3_write_byte_array(object)
-        elsif object.is_a?(Array)
-          amf3_write_array(object)
-        elsif object.is_a?(Hash) || object.is_a?(Object)
-          amf3_write_object(object)
+        case true
+          when object.respond_to?(:encode_amf)
+            object.encode_amf(self)
+          when object.is_a?(NilClass)
+            amf3_write_null
+          when object.is_a?(TrueClass)
+            amf3_write_true
+          when object.is_a?(FalseClass)
+            amf3_write_false
+          when object.is_a?(Numeric)
+            amf3_write_numeric(object)
+          when object.is_a?(Symbol), object.is_a?(String)
+            amf3_write_string(object.to_s)
+          when object.is_a?(Time)
+            amf3_write_time object
+          when object.is_a?(Date)
+            amf3_write_date(object)
+          when object.is_a?(StringIO)
+            amf3_write_byte_array(object)
+          when object.is_a?(Array)
+            amf3_write_array(object)
+          when object.is_a?(Hash), object.is_a?(Object)
+            amf3_write_object(object)
+          else
+            raise AMFError, 'unknown type for serialize'
         end
       end
 
@@ -133,20 +135,14 @@ module AMF
       end
 
       private
-      def amf3_write_string(value)
-        @stream << AMF3_STRING_MARKER
-        amf3_write_utf8_vr value
-      end
-
-      private
       def amf3_write_time(value)
         @stream << AMF3_DATE_MARKER
 
-        if @object_cache[value] != nil
-          amf3_write_reference(@object_cache[value])
+        if @cache_objects[value] != nil
+          amf3_write_reference(@cache_objects[value])
         else
           # Cache time
-          @object_cache.add_obj(value)
+          @cache_objects.add_object(value)
 
           # Build AMF string
           value = value.getutc # Dup and convert to UTC
@@ -160,11 +156,11 @@ module AMF
       def amf3_write_date(value)
         @stream << AMF3_DATE_MARKER
 
-        if @object_cache[value] != nil
-          amf3_write_reference(@object_cache[value])
+        if @cache_objects[value] != nil
+          amf3_write_reference(@cache_objects[value])
         else
           # Cache date
-          @object_cache.add_obj(value)
+          @cache_objects.add_object(value)
 
           # Build AMF string
           @stream << AMF3_NULL_MARKER
@@ -176,10 +172,10 @@ module AMF
       def amf3_write_byte_array(value)
         @stream << AMF3_BYTE_ARRAY_MARKER
 
-        if @object_cache[value] != nil
-          amf3_write_reference(@object_cache[value])
+        if @cache_objects[value] != nil
+          amf3_write_reference(@cache_objects[value])
         else
-          @object_cache.add_obj(value)
+          @cache_objects.add_object(value)
           str = value.string
           @stream << pack_integer(str.bytesize << 1 | 1)
           @stream << str
@@ -192,11 +188,11 @@ module AMF
         @stream << AMF3_ARRAY_MARKER
 
         # Write reference or cache array
-        if @object_cache[value] != nil
-          amf3_write_reference(@object_cache[value])
+        if @cache_objects[value] != nil
+          amf3_write_reference(@cache_objects[value])
           return
         else
-          @object_cache.add_obj(value)
+          @cache_objects.add_object(value)
         end
 
         # Build AMF string for array
@@ -210,23 +206,23 @@ module AMF
       end
 
       private
-      def amf3_write_object(obj, properties = nil, traits = nil)
+      def amf3_write_object(value, properties = nil, traits = nil)
         @stream << AMF3_OBJECT_MARKER
 
         # Caching...
-        if @object_cache[obj] != nil
-          amf3_write_reference(@object_cache[obj])
+        if @cache_objects[value] != nil
+          amf3_write_reference(@cache_objects[value])
           return
         end
 
-        @object_cache.add_obj(obj)
+        @cache_objects.add_object(value)
 
         # Calculate traits if not given
         is_default = false
         if traits.nil?
           traits     =
               {
-                  class_name: @class_mapper.get_as_class_name(obj),
+                  class_name: @class_mapper.get_class_name_remote(value),
                   members:    [],
                   dynamic:    true
               }
@@ -236,10 +232,10 @@ module AMF
         class_name = is_default ? '__default__' : traits[:class_name]
 
         # Write out traits
-        if class_name && @trait_cache[class_name] != nil
-          @stream << pack_integer(@trait_cache[class_name] << 2 | 0x01)
+        if class_name && @cache_traits[class_name] != nil
+          @stream << pack_integer(@cache_traits[class_name] << 2 | 0x01)
         else
-          @trait_cache.add_obj(class_name) if class_name
+          @cache_traits.add_string(class_name) if class_name
 
           # Write out trait header
           header = 0x03 # Not object ref and not trait ref
@@ -249,17 +245,17 @@ module AMF
 
           # Write out class name
           if class_name == '__default__'
-            amf3_write_utf8_vr('')
+            amf3_write_string_internal('')
           else
-            amf3_write_utf8_vr(class_name.to_s)
+            amf3_write_string_internal(class_name.to_s)
           end
 
           # Write out members
-          traits[:members].each { |m| amf3_write_utf8_vr(m) }
+          traits[:members].each { |m| amf3_write_string_internal(m) }
         end
 
         # Extract properties if not given
-        properties = @class_mapper.props_for_serialization(obj) if properties.nil?
+        properties = @class_mapper.object_serialize(value) if properties.nil?
 
         # Write out sealed properties
         traits[:members].each do |m|
@@ -271,7 +267,7 @@ module AMF
         if traits[:dynamic]
           # Write out dynamic properties
           properties.each do |key, val|
-            amf3_write_utf8_vr(key.to_s)
+            amf3_write_string_internal(key.to_s)
             amf3_serialize(val)
           end
 
@@ -281,7 +277,14 @@ module AMF
       end
 
       private
-      def amf3_write_utf8_vr(value)
+      def amf3_write_string(value)
+        @stream << AMF3_STRING_MARKER
+        amf3_write_string_internal value
+      end
+
+
+      private
+      def amf3_write_string_internal(value)
         if value.respond_to?(:encode)
           value = value.dup if value.frozen?
 
@@ -292,13 +295,13 @@ module AMF
 
         if value == ''
           @stream << AMF3_EMPTY_STRING
-        elsif @string_cache[value] != nil
-          amf3_write_reference(@string_cache[value])
+        elsif @cache_strings[value] != nil
+          amf3_write_reference(@cache_strings[value])
         else
 
 
           # Cache string
-          @string_cache.add_obj(value)
+          @cache_strings.add_string(value)
 
           # Build AMF string
           @stream << pack_integer(value.bytesize << 1 | 1)

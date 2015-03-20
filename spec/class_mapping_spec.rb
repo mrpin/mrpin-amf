@@ -1,46 +1,44 @@
 require 'spec_helper.rb'
 
-describe AMF::ClassMapping do
+describe AMF::ClassMapper do
   before :each do
-    AMF::ClassMapping.reset
-    AMF::ClassMapping.define do |m|
-      m.map as: 'ASClass', ruby: 'ClassMappingTest'
-    end
-    @mapper = AMF::ClassMapping.new
+    AMF::ClassMapper.reset
+    AMF::ClassMapper.register_class_alias('ClassMappingTest', 'ASClass')
+
+    @mapper = AMF::ClassMapper.new
   end
 
   describe 'class name mapping' do
     it 'should allow resetting of mappings back to defaults' do
-      expect(@mapper.get_as_class_name('ClassMappingTest')).not_to be_nil
+      expect(@mapper.get_class_name_remote(ClassMappingTest.new)).not_to be_nil
 
-      AMF::ClassMapping.reset
+      AMF::ClassMapper.reset
 
-      @mapper = AMF::ClassMapping.new
-      expect(@mapper.get_as_class_name('ClassMappingTest')).to be_nil
+      @mapper = AMF::ClassMapper.new
+      expect(@mapper.get_class_name_remote(ClassMappingTest.new)).to be_nil
     end
 
     it 'should return AS class name for ruby objects' do
-      expect(@mapper.get_as_class_name(ClassMappingTest.new)).to eq('ASClass')
-      expect(@mapper.get_as_class_name('ClassMappingTest')).to eq('ASClass')
-      expect(@mapper.get_as_class_name(AMF::Types::TypedHash.new('ClassMappingTest'))).to eq('ASClass')
-      expect(@mapper.get_as_class_name('BadClass')).to be_nil
+      expect(@mapper.get_class_name_remote(ClassMappingTest.new)).to eq('ASClass')
+      expect(@mapper.get_class_name_remote(AMF::HashWithType.new('ClassMappingTest'))).to eq('ASClass')
+      expect(@mapper.get_class_name_remote('BadClass')).to be_nil
     end
 
     it 'should instantiate a ruby class' do
-      expect(@mapper.get_ruby_obj('ASClass')).to be_a(ClassMappingTest)
+      expect(@mapper.create_object('ASClass')).to be_a(ClassMappingTest)
     end
 
     it 'should properly instantiate namespaced classes' do
-      AMF::ClassMapping.mappings.map as: 'ASClass', ruby: 'ANamespace::TestRubyClass'
-      @mapper = AMF::ClassMapping.new
+      AMF::ClassMapper.register_class_alias('ANamespace::TestRubyClass', 'ASClass')
+      @mapper = AMF::ClassMapper.new
 
-      expect(@mapper.get_ruby_obj('ASClass')).to be_a(ANamespace::TestRubyClass)
+      expect(@mapper.create_object('ASClass')).to be_a(ANamespace::TestRubyClass)
     end
 
     it 'should return a hash with original type if not mapped' do
-      obj = @mapper.get_ruby_obj('UnmappedClass')
+      obj = @mapper.create_object('UnmappedClass')
 
-      expect(obj).to be_a(AMF::Types::TypedHash)
+      expect(obj).to be_a(AMF::HashWithType)
       expect(obj.type).to eq('UnmappedClass')
     end
 
@@ -49,37 +47,26 @@ describe AMF::ClassMapping do
           %w( )
 
       as_classes.each do |as_class|
-        expect(@mapper.get_ruby_obj(as_class)).not_to be_a(AMF::Types::TypedHash)
-      end
-    end
-
-    it 'should map special classes from ruby by default' do
-      ruby_classes =
-          %w(
-              AMF::Types::ErrorMessage
-            )
-
-      ruby_classes.each do |obj|
-        expect(@mapper.get_as_class_name(obj)).not_to be_nil
+        expect(@mapper.create_object(as_class)).not_to be_a(AMF::Types::HashWithType)
       end
     end
 
     it 'should allow config modification' do
-      AMF::ClassMapping.mappings.map as: 'SecondClass', ruby: 'ClassMappingTest'
-      @mapper = AMF::ClassMapping.new
+      AMF::ClassMapper.register_class_alias('ClassMappingTest', 'SecondClass')
+      @mapper = AMF::ClassMapper.new
 
-      expect(@mapper.get_as_class_name(ClassMappingTest.new)).to eq('SecondClass')
+      expect(@mapper.get_class_name_remote(ClassMappingTest.new)).to eq('SecondClass')
     end
   end
 
   describe 'ruby object populator' do
     it 'should populate a ruby class' do
-      obj = @mapper.populate_ruby_obj ClassMappingTest.new, {:prop_a => 'Data'}
+      obj = @mapper.object_deserialize ClassMappingTest.new, {:prop_a => 'Data'}
       expect(obj.prop_a).to eq('Data')
     end
 
     it 'should populate a typed hash' do
-      obj = @mapper.populate_ruby_obj AMF::Types::TypedHash.new('UnmappedClass'), {prop_a: 'Data'}
+      obj = @mapper.object_deserialize AMF::HashWithType.new('UnmappedClass'), {prop_a: 'Data'}
       expect(obj[:prop_a]).to eq('Data')
     end
   end
@@ -87,7 +74,7 @@ describe AMF::ClassMapping do
   describe 'property extractor' do
     it 'should extract hash properties' do
       hash  = {a: 'test1', 'b' => 'test2'}
-      props = @mapper.props_for_serialization(hash)
+      props = @mapper.object_serialize(hash)
       expect(props).to eq({'a' => 'test1', 'b' => 'test2'})
     end
 
@@ -95,7 +82,7 @@ describe AMF::ClassMapping do
       obj        = ClassMappingTest.new
       obj.prop_a = 'Test A'
 
-      hash = @mapper.props_for_serialization obj
+      hash = @mapper.object_serialize obj
       expect(hash).to eq({'prop_a' => 'Test A', 'prop_b' => nil})
     end
 
@@ -104,7 +91,7 @@ describe AMF::ClassMapping do
       obj.prop_a = 'Test A'
       obj.prop_c = 'Test C'
 
-      hash = @mapper.props_for_serialization obj
+      hash = @mapper.object_serialize obj
       expect(hash).to eq({'prop_a' => 'Test A', 'prop_b' => nil, 'prop_c' => 'Test C'})
     end
   end

@@ -4,7 +4,7 @@ require 'spec_helper.rb'
 
 describe 'when deserializing' do
   before :each do
-    AMF::CLASS_MAPPER.reset
+    AMF.class_mapper.reset
   end
 
   describe 'AMF3' do
@@ -19,38 +19,38 @@ describe 'when deserializing' do
 
     describe 'simple messages' do
       it 'should deserialize a null' do
-        first_request_eq('simple/amf3-null.bin', nil)
+        first_object_eq('simple/amf3-null.bin', nil)
       end
 
       it 'should deserialize a false' do
-        first_request_eq('simple/amf3-false.bin', false)
+        first_object_eq('simple/amf3-false.bin', false)
       end
 
       it 'should deserialize a true' do
-        first_request_eq('simple/amf3-true.bin', true)
+        first_object_eq('simple/amf3-true.bin', true)
       end
 
       it 'should deserialize integers' do
-        first_request_eq('simple/amf3-max.bin', AMF::MAX_INTEGER)
-        first_request_eq('simple/amf3-0.bin', 0)
-        first_request_eq('simple/amf3-min.bin', AMF::MIN_INTEGER)
+        first_object_eq('simple/amf3-max.bin', AMF::MAX_INTEGER)
+        first_object_eq('simple/amf3-0.bin', 0)
+        first_object_eq('simple/amf3-min.bin', AMF::MIN_INTEGER)
       end
 
       it 'should deserialize large integers' do
-        first_request_eq('simple/amf3-large-max.bin', AMF::MAX_INTEGER + 1.0)
-        first_request_eq('simple/amf3-large-min.bin', AMF::MIN_INTEGER - 1.0)
+        first_object_eq('simple/amf3-large-max.bin', AMF::MAX_INTEGER + 1.0)
+        first_object_eq('simple/amf3-large-min.bin', AMF::MIN_INTEGER - 1.0)
       end
 
       it 'should deserialize BigNums' do
-        first_request_eq('simple/amf3-bignum.bin', 2.0**1000)
+        first_object_eq('simple/amf3-bignum.bin', 2.0**1000)
       end
 
       it 'should deserialize a simple string' do
-        first_request_eq('simple/amf3-string.bin', 'String . String')
+        first_object_eq('simple/amf3-string.bin', 'String . String')
       end
 
       it 'should deserialize a symbol as a string' do
-        first_request_eq('simple/amf3-symbol.bin', 'foo')
+        first_object_eq('simple/amf3-symbol.bin', 'foo')
       end
 
     end
@@ -58,7 +58,7 @@ describe 'when deserializing' do
     describe 'objects' do
 
       it 'should deserialize dates' do
-        first_request_eq('complex/amf3-date.bin', Time.at(0))
+        first_object_eq('complex/amf3-date.bin', Time.at(0))
       end
 
       it 'should deserialize an unmapped object as a dynamic anonymous object' do
@@ -77,7 +77,7 @@ describe 'when deserializing' do
       end
 
       it 'should deserialize a mapped object as a mapped ruby class instance' do
-        AMF::CLASS_MAPPER.define { |m| m.map :as => 'org.amf.ASClass', ruby: 'RubyClass' }
+        AMF.class_mapper.register_class_alias('RubyClass', 'org.amf.ASClass')
 
         request = get_first_request('complex/amf3-typed-object.bin')
 
@@ -87,7 +87,7 @@ describe 'when deserializing' do
       end
 
       it 'should deserialize a hash as a dynamic anonymous object' do
-        first_request_eq('complex/amf3-hash.bin', {'foo' => 'bar', 'answer' => 42})
+        first_object_eq('complex/amf3-hash.bin', {'foo' => 'bar', 'answer' => 42})
       end
 
       it 'should deserialize an empty array' do
@@ -133,7 +133,7 @@ describe 'when deserializing' do
 
         keys = request.keys
         expect(keys.length).to eq(2)
-        obj_key, str_key = keys[0].is_a?(AMF::Types::TypedHash) ? [keys[0], keys[1]] : [keys[1], keys[0]]
+        obj_key, str_key = keys[0].is_a?(AMF::HashWithType) ? [keys[0], keys[1]] : [keys[1], keys[0]]
 
         expect(obj_key.type).to eq('org.amf.ASClass')
         expect(request[obj_key]).to eq('asdf2')
@@ -175,7 +175,7 @@ describe 'when deserializing' do
       end
 
       it 'should keep reference of duplicate object traits' do
-        AMF::CLASS_MAPPER.define { |m| m.map :as => 'org.amf.ASClass', ruby: 'RubyClass' }
+        AMF.class_mapper.register_class_alias('RubyClass', 'org.amf.ASClass')
 
         output = get_first_request('references/amf3-trait-ref.bin')
 

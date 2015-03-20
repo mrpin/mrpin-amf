@@ -31,38 +31,38 @@ module AMF
       # data.
       # raise AMFError if error appeared in deserialize, source is nil
       # raise AMFErrorIncomplete if source is incomplete
-      # return hash {requests: [], incomplete_request: String}
+      # return hash {objects: [], incomplete_objects: String}
       public
       def deserialize(source)
         raise AMFError, 'no source to deserialize' if source.nil?
 
         @source = source.is_a?(StringIO) ? source : StringIO.new(source)
 
-        requests = []
+        objects = []
 
-        incomplete_request = nil
+        incomplete_objects = nil
 
         until @source.eof?
           begin
-            @string_cache = []
-            @object_cache = []
-            @trait_cache  = []
+            @cache_strings = []
+            @cache_objects = []
+            @cache_traits  = []
 
             @position_request_read = @source.pos
 
-            requests << amf3_deserialize
+            objects << amf3_deserialize
           rescue AMFErrorIncomplete => e
             @source.pos = @position_request_read
 
-            incomplete_request = @source.read
+            incomplete_objects = @source.read
 
             break
           end
         end
 
         {
-            requests:           requests,
-            incomplete_request: incomplete_request
+            objects:            objects,
+            incomplete_objects: incomplete_objects
         }
       end
 
@@ -114,7 +114,7 @@ module AMF
 
         if (type & 0x01) == 0 #is reference?
           reference = type >> 1
-          result    = @object_cache[reference]
+          result    = @cache_objects[reference]
         end
 
         result
@@ -126,7 +126,7 @@ module AMF
 
         if (type & 0x01) == 0 #is reference?
           reference = type >> 1
-          result    = @string_cache[reference]
+          result    = @cache_strings[reference]
         end
 
         result
@@ -195,7 +195,7 @@ module AMF
 
             result = @source.read(length)
             result.force_encoding('UTF-8') if result.respond_to?(:force_encoding)
-            @string_cache << result
+            @cache_strings << result
           end
         end
 
@@ -218,7 +218,7 @@ module AMF
           end
 
           result = StringIO.new(@source.read(length))
-          @object_cache << result
+          @cache_objects << result
         end
 
         result
@@ -236,7 +236,7 @@ module AMF
           length        = type >> 1
           property_name = amf3_read_string
           result        = property_name.length > 0 ? {} : []
-          @object_cache << result
+          @cache_objects << result
 
           while property_name.length > 0
             value                 = amf3_deserialize
@@ -265,7 +265,7 @@ module AMF
 
           if class_is_reference
             reference = class_type >> 1
-            traits    = @trait_cache[reference]
+            traits    = @cache_traits[reference]
           else
             dynamic         = (class_type & 0x04) != 0
             attribute_count = class_type >> 3
@@ -276,15 +276,15 @@ module AMF
 
             traits =
                 {
-                    class_name:     class_name,
-                    members:        class_attributes,
-                    dynamic:        dynamic
+                    class_name: class_name,
+                    members:    class_attributes,
+                    dynamic:    dynamic
                 }
-            @trait_cache << traits
+            @cache_traits << traits
           end
 
-          result = @class_mapper.get_ruby_obj(traits[:class_name])
-          @object_cache << result
+          result = @class_mapper.create_object(traits[:class_name])
+          @cache_objects << result
 
           properties = {}
 
@@ -300,7 +300,7 @@ module AMF
             end
           end
 
-          @class_mapper.populate_ruby_obj(result, properties)
+          @class_mapper.object_deserialize(result, properties)
         end
 
         result
@@ -317,7 +317,7 @@ module AMF
         if result.nil?
           seconds = read_double(@source).to_f / 1000
           result  = Time.at(seconds)
-          @object_cache << result
+          @cache_objects << result
         end
 
         result
@@ -333,7 +333,7 @@ module AMF
 
         if result.nil?
           result = {}
-          @object_cache << result
+          @cache_objects << result
           length    = type >> 1
           weak_keys = read_int8(@source) # Ignore: Not supported in ruby
 

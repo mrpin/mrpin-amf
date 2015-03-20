@@ -7,7 +7,7 @@ require 'rational'
 
 describe 'when serializing' do
   before :each do
-    AMF::CLASS_MAPPER.reset
+    AMF.class_mapper.reset
   end
 
   describe 'AMF3' do
@@ -80,7 +80,7 @@ describe 'when serializing' do
       end
 
       it 'should serialize a simple string' do
-        expected = object_fixture('amf3-string.bin')
+        expected = object_fixture('simple/amf3-string.bin')
         input    = 'String . String'
         output   = AMF.serialize(input)
         expect(output).to eq(expected)

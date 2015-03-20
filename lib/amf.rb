@@ -4,10 +4,10 @@ $:.unshift "#{File.expand_path(File.dirname(__FILE__))}/amf/types/"
 
 require 'date'
 require 'stringio'
-require 'amf/common/typed_hash'
+require 'amf/common/hash_with_type'
 require 'amf/pure/errors/all_files'
 require 'amf/pure/helpers/all_files'
-require 'amf/pure/mapping/class_mapping'
+require 'amf/pure/mapping/class_mapper'
 
 
 #todo: implement C version
@@ -93,33 +93,39 @@ require 'amf/pure'
 #   end
 #
 module AMF
-  #
-  # Constants
-  #
+
+  class << self
+
+
+    attr_accessor :class_mapper
+
+    # Deserialize the AMF string _source_ of the given AMF version into a Ruby
+    # data structure and return it. Creates an instance of <tt>RocketAMF::Deserializer</tt>
+    # with a new instance of <tt>RocketAMF::CLASS_MAPPER</tt> and calls deserialize
+    # on it with the given source, returning the result.
+    def deserialize(source)
+      deserializer = AMF::Deserializer.new(class_mapper.new)
+      deserializer.deserialize(source)
+    end
+
+    # Serialize the given Ruby data structure _obj_ into an AMF stream using the
+    # given AMF version. Creates an instance of <tt>RocketAMF::Serializer</tt>
+    # with a new instance of <tt>RocketAMF::CLASS_MAPPER</tt> and calls serialize
+    # on it with the given object, returning the result.
+    def serialize(obj)
+      serializer = AMF::Serializer.new(class_mapper.new)
+      serializer.serialize(obj)
+    end
+  end
+
+
 
   #todo: use c version
-  CLASS_MAPPER = AMF::ClassMapping
+  # Activating the C Class Mapper:
+  #   require 'rubygems'
+  #   require 'amf'
+  #   AMF::ClassMapper = AMF::Ext::FastClassMapping
 
-  #
-  # Static methods
-  #
-
-  # Deserialize the AMF string _source_ of the given AMF version into a Ruby
-  # data structure and return it. Creates an instance of <tt>RocketAMF::Deserializer</tt>
-  # with a new instance of <tt>RocketAMF::CLASS_MAPPER</tt> and calls deserialize
-  # on it with the given source, returning the result.
-  def self.deserialize(source)
-    deserializer = AMF::Deserializer.new(CLASS_MAPPER.new)
-    deserializer.deserialize(source)
-  end
-
-  # Serialize the given Ruby data structure _obj_ into an AMF stream using the
-  # given AMF version. Creates an instance of <tt>RocketAMF::Serializer</tt>
-  # with a new instance of <tt>RocketAMF::CLASS_MAPPER</tt> and calls serialize
-  # on it with the given object, returning the result.
-  def self.serialize(obj)
-    serializer = AMF::Serializer.new(CLASS_MAPPER.new)
-    serializer.serialize(obj)
-  end
+  self.class_mapper = AMF::ClassMapper
 
 end

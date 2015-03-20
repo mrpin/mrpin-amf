@@ -2,15 +2,15 @@ require 'amf/pure/mapping/mapping_set'
 
 module AMF
 
-  # Handles class name mapping between AS and ruby and assists in
-  # serializing and deserializing data between them. Simply map an AS class to a
+  # Handles class name mapping between other language and ruby and assists in
+  # serializing and deserializing data between them. Simply map an other-language class to a
   # ruby class and when the object is (de)serialized it will end up as the
   # appropriate class.
   #
   # Example:
   #
   #   AMF::CLASS_MAPPER.define do |m|
-  #     m.map remote: 'AsClass', local: 'RubyClass'
+  #     m.map remote: 'SomeClass', local: 'RubyClass'
   #     m.map remote: 'vo.User', local: 'Model::User'
   #   end
   #
@@ -57,83 +57,72 @@ module AMF
   # classes during serialization using <tt>encode_amf</tt>, the faster C class
   # mapper should be perfectly safe to use.
   #
-  # Activating the C Class Mapper:
-  #
-  #   require 'rubygems'
-  #   require 'amf'
-  #todo:review
-  #   AMF::ClassMapper = AMF::Ext::FastClassMapping
+
   class ClassMapper
+
+
     class << self
-      # Returns the mapping set with all the class mappings that is currently
-      # being used.
-      def mappings
-        @mappings ||= MappingSet.new
+
+      attr_reader :map
+
+      #
+      # Methods
+      #
+
+      # Copies configuration from class level configs to populate object
+      public
+      def initialize
+        @map = MappingSet.new
       end
 
-      # Define class mappings in the block. Block is passed a <tt>MappingSet</tt> object
-      # as the first parameter.
-      #
-      # Example:
-      #
-      #   AMF::CLASS_MAPPER.define do |m|
-      #     m.map remote: 'AsClass', local: 'RubyClass'
-      #   end
-      def define(&block) #:yields: mapping_set
-        yield mappings
+      public
+      def register_class_alias(class_local, class_remote)
+        @map.register_class_alias(class_local, class_remote)
       end
 
-      # Reset all class mappings except the defaults and return
+      # Reset all class mappings except the defaults
+      public
       def reset
-        @mappings             = nil
+        @map = MappingSet.new
+        nil
       end
-    end
+    end #end of static
 
-    #
-    # Properties
-    #
-
-    #
-    # Methods
-    #
-
-    # Copies configuration from class level configs to populate object
     public
     def initialize
-      @mappings             = self.class.mappings
+      #cache static variable
+      @map = ClassMapper.map
     end
 
-    # Returns the other-language class name for the given ruby object. Will also
-    # take a string containing the ruby class name.
-    def get_as_class_name(obj)
+    # Returns the other-language class name for the given ruby object.
+    public
+    def get_class_name_remote(object)
       # Get class name
-      if obj.is_a?(String)
-        ruby_class_name = obj
-      elsif obj.is_a?(HashWithType)
-        ruby_class_name = obj.type
-      elsif obj.is_a?(Hash)
+      if object.is_a?(HashWithType)
+        ruby_class_name = object.type
+      elsif object.is_a?(Hash)
         return nil
       else
-        ruby_class_name = obj.class.name
+        ruby_class_name = object.class.name
       end
 
-      # Get mapped AS class name
-      @mappings.get_as_class_name(ruby_class_name)
+      # Get mapped remote class name
+      @map.get_class_name_remote(ruby_class_name)
     end
 
     # Instantiates a ruby object using the mapping configuration based on the
     # source ActionScript class name. If there is no mapping defined, it returns
-    # a <tt>AMF::Types::TypedHash</tt> with the serialized class name.
+    # a <tt>AMF::HashWithType</tt> with the serialized class name.
     public
-    def get_ruby_obj(as_class_name)
+    def create_object(class_name_remote)
       result = nil
 
-      ruby_class_name = @mappings.get_ruby_class_name(as_class_name)
-      if ruby_class_name.nil?
+      class_name_local = @map.get_class_name_local(class_name_remote)
+      if class_name_local.nil?
         # Populate a simple hash, since no mapping
-        result = HashWithType.new(as_class_name)
+        result = HashWithType.new(class_name_remote)
       else
-        ruby_class = ruby_class_name.split('::').inject(Kernel) { |scope, const_name| scope.const_get(const_name) }
+        ruby_class = class_name_local.split('::').inject(Kernel) { |scope, const_name| scope.const_get(const_name) }
         result     = ruby_class.new
       end
 
@@ -142,8 +131,7 @@ module AMF
 
     # Populates the ruby object using the given properties. props will be hashes with symbols for keys.
     public
-    def populate_ruby_obj(target, props)
-
+    def object_deserialize(target, props)
       # Don't even bother checking if it responds to setter methods if it's a TypedHash
       if target.is_a?(HashWithType)
         target.merge! props
@@ -169,7 +157,7 @@ module AMF
     # ruby serializer performs a sort on the keys to acheive consistent, testable
     # results.
     public
-    def props_for_serialization(ruby_obj)
+    def object_serialize(ruby_obj)
       result = {}
 
       # Handle hashes

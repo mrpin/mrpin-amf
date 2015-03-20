@@ -10,19 +10,19 @@ def object_fixture(binary_path)
   data
 end
 
-def first_request_eq(object_fixture, value)
+def first_object_eq(object_fixture, value)
   input  = object_fixture(object_fixture)
   output = AMF.deserialize(input)
 
-  request = output[:requests][0]
+  first_object = output[:objects][0]
 
-  expect(request).to eq(value)
+  expect(first_object).to eq(value)
 end
 
 def get_first_request(object_fixture)
   input  = object_fixture(object_fixture)
   output = AMF.deserialize(input)
 
-  requests = output[:requests]
+  requests = output[:objects]
   requests[0]
 end

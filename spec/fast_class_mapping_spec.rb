@@ -11,32 +11,32 @@ describe AMF::Ext::FastClassMapping do
 
   describe 'class name mapping' do
     it 'should allow resetting of mappings back to defaults' do
-      @mapper.get_as_class_name('ClassMappingTest').should_not be_nil
+      @mapper.get_class_name_remote('ClassMappingTest').should_not be_nil
       AMF::Ext::FastClassMapping.reset
       @mapper = AMF::Ext::FastClassMapping.new
-      @mapper.get_as_class_name('ClassMappingTest').should be_nil
+      @mapper.get_class_name_remote('ClassMappingTest').should be_nil
     end
 
     it 'should return AS class name for ruby objects' do
-      @mapper.get_as_class_name(ClassMappingTest.new).should == 'ASClass'
-      @mapper.get_as_class_name('ClassMappingTest').should == 'ASClass'
-      @mapper.get_as_class_name(AMF::Types::TypedHash.new('ClassMappingTest')).should == 'ASClass'
-      @mapper.get_as_class_name('BadClass').should be_nil
+      @mapper.get_class_name_remote(ClassMappingTest.new).should == 'ASClass'
+      @mapper.get_class_name_remote('ClassMappingTest').should == 'ASClass'
+      @mapper.get_class_name_remote(AMF::Types::HashWithType.new('ClassMappingTest')).should == 'ASClass'
+      @mapper.get_class_name_remote('BadClass').should be_nil
     end
 
     it 'should instantiate a ruby class' do
-      @mapper.get_ruby_obj('ASClass').should be_a(ClassMappingTest)
+      @mapper.create_object('ASClass').should be_a(ClassMappingTest)
     end
 
     it 'should properly instantiate namespaced classes' do
-      AMF::Ext::FastClassMapping.mappings.map :as => 'ASClass', ruby: 'ANamespace::TestRubyClass'
+      AMF::Ext::FastClassMapping.map.map :as => 'ASClass', ruby: 'ANamespace::TestRubyClass'
       @mapper = AMF::Ext::FastClassMapping.new
-      @mapper.get_ruby_obj('ASClass').should be_a(ANamespace::TestRubyClass)
+      @mapper.create_object('ASClass').should be_a(ANamespace::TestRubyClass)
     end
 
     it 'should return a hash with original type if not mapped' do
-      obj = @mapper.get_ruby_obj('UnmappedClass')
-      obj.should be_a(AMF::Types::TypedHash)
+      obj = @mapper.create_object('UnmappedClass')
+      obj.should be_a(AMF::Types::HashWithType)
       obj.type.should == 'UnmappedClass'
     end
 
@@ -48,7 +48,7 @@ describe AMF::Ext::FastClassMapping do
             )
 
       as_classes.each do |as_class|
-        @mapper.get_ruby_obj(as_class).should_not be_a(AMF::Types::TypedHash)
+        @mapper.create_object(as_class).should_not be_a(AMF::Types::HashWithType)
       end
     end
 
@@ -59,25 +59,25 @@ describe AMF::Ext::FastClassMapping do
             )
 
       ruby_classes.each do |obj|
-        @mapper.get_as_class_name(obj).should_not be_nil
+        @mapper.get_class_name_remote(obj).should_not be_nil
       end
     end
 
     it 'should allow config modification' do
-      AMF::Ext::FastClassMapping.mappings.map :as => 'SecondClass', ruby: 'ClassMappingTest'
+      AMF::Ext::FastClassMapping.map.map :as => 'SecondClass', ruby: 'ClassMappingTest'
       @mapper = AMF::Ext::FastClassMapping.new
-      @mapper.get_as_class_name(ClassMappingTest.new).should == 'SecondClass'
+      @mapper.get_class_name_remote(ClassMappingTest.new).should == 'SecondClass'
     end
   end
 
   describe 'ruby object populator' do
     it 'should populate a ruby class' do
-      obj = @mapper.populate_ruby_obj ClassMappingTest.new, {:prop_a => 'Data'}
+      obj = @mapper.object_deserialize ClassMappingTest.new, {:prop_a => 'Data'}
       obj.prop_a.should == 'Data'
     end
 
     it 'should populate a typed hash' do
-      obj = @mapper.populate_ruby_obj AMF::Types::TypedHash.new('UnmappedClass'), {'prop_a' => 'Data'}
+      obj = @mapper.object_deserialize AMF::Types::HashWithType.new('UnmappedClass'), {'prop_a' => 'Data'}
       obj['prop_a'].should == 'Data'
     end
   end
@@ -96,7 +96,7 @@ describe AMF::Ext::FastClassMapping do
 
     it 'should return hash without modification' do
       hash  = {:a => 'test1', 'b' => 'test2'}
-      props = @mapper.props_for_serialization(hash)
+      props = @mapper.object_serialize(hash)
       props.should === hash
     end
 
@@ -104,7 +104,7 @@ describe AMF::Ext::FastClassMapping do
       obj        = ClassMappingTest.new
       obj.prop_a = 'Test A'
 
-      hash = @mapper.props_for_serialization obj
+      hash = @mapper.object_serialize obj
       hash.should == prop_hash({'prop_a' => 'Test A', 'prop_b' => nil})
     end
 
@@ -113,7 +113,7 @@ describe AMF::Ext::FastClassMapping do
       obj.prop_a = 'Test A'
       obj.prop_c = 'Test C'
 
-      hash = @mapper.props_for_serialization obj
+      hash = @mapper.object_serialize obj
       hash.should == prop_hash({'prop_a' => 'Test A', 'prop_b' => nil, 'prop_c' => 'Test C'})
     end
 
@@ -124,7 +124,7 @@ describe AMF::Ext::FastClassMapping do
 
       # Cache properties
       obj  = ClassMappingTest3.new
-      hash = @mapper.props_for_serialization obj
+      hash = @mapper.object_serialize obj
 
       # Add a method to ClassMappingTest3
       class ClassMappingTest3;
@@ -135,12 +135,12 @@ describe AMF::Ext::FastClassMapping do
       obj        = ClassMappingTest3.new
       obj.prop_a = 'Test A'
       obj.prop_b = 'Test B'
-      hash       = @mapper.props_for_serialization obj
+      hash       = @mapper.object_serialize obj
       hash.should == prop_hash({'prop_a' => 'Test A'})
 
       # Test that new class mapper *does* have new property (cache per instance)
       @mapper = AMF::Ext::FastClassMapping.new
-      hash    = @mapper.props_for_serialization obj
+      hash    = @mapper.object_serialize obj
       hash.should == prop_hash({'prop_a' => 'Test A', 'prop_b' => 'Test B'})
     end
   end

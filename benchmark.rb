@@ -41,7 +41,7 @@ end
   class_mapper     = nil
 
   if use_ruby_version
-    class_mapper = AMF::ClassMapping
+    class_mapper = AMF::ClassMapper
   else
     class_mapper = AMF::Ext::FastClassMapping
   end
