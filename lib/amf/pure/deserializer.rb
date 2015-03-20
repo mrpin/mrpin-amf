@@ -48,11 +48,11 @@ module AMF
             @cache_objects = []
             @cache_traits  = []
 
-            @position_request_read = @source.pos
-
             objects << amf3_deserialize
-          rescue AMFErrorIncomplete => e
-            @source.pos = @position_request_read
+          rescue AMFErrorIncomplete, AMFError => e
+            objects.clear
+
+            @source.pos = 0
 
             incomplete_objects = @source.read
 
