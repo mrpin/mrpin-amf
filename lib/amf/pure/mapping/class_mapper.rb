@@ -46,6 +46,13 @@ module AMF
         @map.register_class_alias(class_local, class_remote)
       end
 
+      public
+      def register_classes(map)
+        map.each do |class_local, class_remote|
+          self.register_class_alias(class_local, class_remote)
+        end
+      end
+
       # Reset all class mappings except the defaults
       public
       def reset
