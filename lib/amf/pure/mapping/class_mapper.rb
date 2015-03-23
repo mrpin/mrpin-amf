@@ -9,44 +9,12 @@ module AMF
   #
   # Example:
   #
-  #   AMF::CLASS_MAPPER.define do |m|
-  #     m.map remote: 'SomeClass', local: 'RubyClass'
-  #     m.map remote: 'vo.User', local: 'Model::User'
-  #   end
-  #
-  # == Object Population/Serialization
-  #
-  # In addition to handling class name mapping, it also provides helper methods
-  # for populating ruby objects from AMF and extracting properties from ruby objects
-  # for serialization. Support for hash-like objects and objects using
-  # <tt>attr_accessor</tt> for properties is currently built in, but custom classes
-  # may require subclassing the class mapper to add support.
-  #
-  # == Complete Replacement
-  #
-  # In some cases, it may be beneficial to replace the default provider of class
-  # mapping completely. In this case, simply assign your class mapper class to
-  # <tt>AMF::CLASS_MAPPER</tt> after loading gem. Through the magic of
-  # <tt>const_missing</tt>, <tt>CLASS_MAPPER</tt> is only defined after the first
-  # access by default, so you get no annoying warning messages. Custom class mappers
-  # must implement the following methods on instances: <tt>use_array_collection</tt>,
-  # <tt>get_as_class_name</tt>, <tt>get_ruby_obj</tt>, <tt>populate_ruby_obj</tt>,
-  # and <tt>props_for_serialization</tt>. In addition, it should have a class level
-  # <tt>mappings</tt> method that returns the mapping set it's using, although its
-  # not required. If you'd like to see an example of what complete replacement
-  # offers, check out RubyAMF (http://github.com/rubyamf/rubyamf).
-  #
-  # Example:
-  #
-  #   require 'rubygems'
-  #   require 'amf'
-  #
-  #   AMF.const_set(CLASS_MAPPER, MyCustomClassMapper)
+  #   AMF.class_mapper.register_class_alias('SomeClass', 'RubyClass')
   #
   # == C ClassMapper
   #
   # The C class mapper, <tt>AMF::Ext::FastClassMapping</tt>, has the same
-  # public API that <tt>RubyAMF::ClassMapping</tt> does, but has some additional
+  # public API that <tt>AMF::ClassMapper</tt> does, but has some additional
   # performance optimizations that may interfere with the proper serialization of
   # objects. To reduce the cost of processing public methods for every object,
   # its implementation of <tt>props_for_serialization</tt> caches valid properties
@@ -60,7 +28,6 @@ module AMF
 
   class ClassMapper
 
-
     class << self
 
       attr_reader :map
@@ -69,7 +36,6 @@ module AMF
       # Methods
       #
 
-      # Copies configuration from class level configs to populate object
       public
       def initialize
         @map = MappingSet.new
@@ -87,6 +53,13 @@ module AMF
         nil
       end
     end #end of static
+
+    # init static
+    self.initialize
+
+    #
+    # Methods
+    #
 
     public
     def initialize
@@ -118,6 +91,7 @@ module AMF
       result = nil
 
       class_name_local = @map.get_class_name_local(class_name_remote)
+
       if class_name_local.nil?
         # Populate a simple hash, since no mapping
         result = HashWithType.new(class_name_remote)
@@ -139,7 +113,8 @@ module AMF
       end
 
       # Some type of object
-      hash_like = target.respond_to?("[]=")
+      hash_like = target.respond_to?('[]=')
+
       props.each do |key, value|
         if target.respond_to?("#{key}=")
           target.send("#{key}=", value)
