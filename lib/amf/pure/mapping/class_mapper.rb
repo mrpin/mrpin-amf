@@ -97,6 +97,10 @@ module AMF
     def create_object(class_name_remote)
       result = nil
 
+      if class_name_remote.nil? || class_name_remote.empty?
+        return {}
+      end
+
       class_name_local = @map.get_class_name_local(class_name_remote)
 
       if class_name_local.nil?
