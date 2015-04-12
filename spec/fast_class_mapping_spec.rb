@@ -37,7 +37,7 @@ describe AMF::Ext::FastClassMapping do
     it 'should return a hash with original type if not mapped' do
       obj = @mapper.create_object('UnmappedClass')
       obj.should be_a(AMF::Types::HashWithType)
-      obj.type.should == 'UnmappedClass'
+      obj.class_type.should == 'UnmappedClass'
     end
 
     it 'should map special classes from AS by default' do

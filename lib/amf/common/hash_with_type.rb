@@ -7,14 +7,14 @@ module AMF
     # Properties
     #
 
-    attr_reader :type
+    attr_reader :class_type
 
     #
     # Methods
     #
 
     def initialize(type)
-      @type = type
+      @class_type = type
     end
   end
 end

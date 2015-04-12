@@ -73,7 +73,7 @@ describe 'when deserializing' do
         request = get_first_request('complex/amf3-dynamic-object.bin')
 
         expect(request).to match(value)
-        expect(request.type).to eq('')
+        expect(request.class_type).to eq('')
       end
 
       it 'should deserialize a mapped object as a mapped ruby class instance' do
@@ -135,7 +135,7 @@ describe 'when deserializing' do
         expect(keys.length).to eq(2)
         obj_key, str_key = keys[0].is_a?(AMF::HashWithType) ? [keys[0], keys[1]] : [keys[1], keys[0]]
 
-        expect(obj_key.type).to eq('org.amf.ASClass')
+        expect(obj_key.class_type).to eq('org.amf.ASClass')
         expect(request[obj_key]).to eq('asdf2')
         expect(str_key).to eq('bar')
         expect(request[str_key]).to eq('asdf1')

@@ -79,7 +79,7 @@ module AMF
     def get_class_name_remote(object)
       # Get class name
       if object.is_a?(HashWithType)
-        ruby_class_name = object.type
+        ruby_class_name = object.class_type
       elsif object.is_a?(Hash)
         return nil
       else

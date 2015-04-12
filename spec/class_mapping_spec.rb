@@ -39,7 +39,7 @@ describe AMF::ClassMapper do
       obj = @mapper.create_object('UnmappedClass')
 
       expect(obj).to be_a(AMF::HashWithType)
-      expect(obj.type).to eq('UnmappedClass')
+      expect(obj.class_type).to eq('UnmappedClass')
     end
 
     it 'should map special classes from AS by default' do
